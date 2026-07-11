@@ -1,0 +1,25 @@
+{
+  "name": "arcana-contracts",
+  "version": "1.0.0",
+  "description": "ARCANA Protocol smart contracts — zkML-powered DeFi credentials on HashKey Chain",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:testnet": "hardhat run scripts/deploy.ts --network hashkeyTestnet",
+    "deploy:mainnet": "hardhat run scripts/deploy.ts --network hashkey",
+    "verify": "hardhat verify --network hashkey",
+    "clean": "hardhat clean",
+    "node": "hardhat node"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.0",
+    "dotenv": "^16.4.0",
+    "typescript": "^5.4.0",
+    "ts-node": "^10.9.0",
+    "@types/node": "^20.0.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0"
+  }
+}
