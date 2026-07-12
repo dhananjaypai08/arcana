@@ -11,6 +11,7 @@ import { ARCANA_PLEDGE_ABI, ERC20_ABI } from "@/lib/abis";
 import { CONTRACTS, EXPLORER } from "@/lib/wagmi";
 import { useTxFlow } from "@/lib/useTxFlow";
 import { toast } from "@/lib/toast";
+import { useMounted } from "@/lib/useMounted";
 
 const USDC_DECIMALS = 6;
 const formatUSDC = (v: bigint) => (Number(v) / 10 ** USDC_DECIMALS).toFixed(2);
@@ -35,6 +36,7 @@ interface Pledge {
 const STATUS_LABELS = ["open", "matched", "resolved", "expired"] as const;
 
 export default function PledgePage() {
+  const mounted = useMounted();
   const { address, isConnected } = useAccount();
   const [showCreate, setShowCreate] = useState(false);
   const [currentTier, setCurrentTier] = useState(1);
@@ -174,7 +176,7 @@ export default function PledgePage() {
               Bet on your own improvement. Pledge to reach a higher ZK credit tier — earn a premium if you succeed, settled trustlessly by zero-knowledge proofs.
             </p>
           </div>
-          {isConnected && (
+          {mounted && isConnected && (
             <Button onClick={() => setShowCreate(!showCreate)}>+ Create Pledge</Button>
           )}
         </div>
@@ -358,7 +360,7 @@ export default function PledgePage() {
           })}
         </div>
 
-        {!isConnected && (
+        {mounted && !isConnected && (
           <div className="text-center mt-8 py-10 glass rounded-2xl">
             <p className="text-secondary mb-4">Connect wallet to create or take pledges</p>
             <ConnectWallet />

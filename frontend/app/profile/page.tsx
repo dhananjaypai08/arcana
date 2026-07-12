@@ -12,6 +12,7 @@ import { CONTRACTS, EXPLORER } from "@/lib/wagmi";
 import { useActivity } from "@/lib/useActivity";
 import { clearActivity } from "@/lib/activity";
 import { toast } from "@/lib/toast";
+import { useMounted } from "@/lib/useMounted";
 
 const USDC_DECIMALS = 6;
 const formatUSDC = (v: bigint | undefined) =>
@@ -30,6 +31,7 @@ function timeAgo(ts: number) {
 }
 
 export default function ProfilePage() {
+  const mounted = useMounted();
   const { address, isConnected } = useAccount();
   const activity = useActivity(address);
 
@@ -97,7 +99,7 @@ export default function ProfilePage() {
   const pendingCount = activity.filter((a) => a.status === "pending").length;
   const confirmedCount = activity.filter((a) => a.status === "confirmed").length;
 
-  if (!isConnected) {
+  if (!mounted || !isConnected) {
     return (
       <div className="min-h-screen gradient-bg flex items-center justify-center">
         <div className="text-center">

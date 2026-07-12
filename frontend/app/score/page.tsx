@@ -11,6 +11,7 @@ import { ARCANA_CRED_ABI } from "@/lib/abis";
 import { CONTRACTS, EXPLORER } from "@/lib/wagmi";
 import { useTxFlow } from "@/lib/useTxFlow";
 import { toast } from "@/lib/toast";
+import { useMounted } from "@/lib/useMounted";
 
 type Step = "idle" | "fetching" | "review" | "proving" | "minting" | "done" | "error";
 
@@ -19,6 +20,7 @@ function errorMessage(e: unknown): string {
 }
 
 export default function ScorePage() {
+  const mounted = useMounted();
   const { address, isConnected } = useAccount();
   const [step, setStep] = useState<Step>("idle");
   const [signals, setSignals] = useState<ScoreSignals | null>(null);
@@ -114,7 +116,7 @@ export default function ScorePage() {
     setStep("done");
   }
 
-  if (!isConnected) {
+  if (!mounted || !isConnected) {
     return (
       <div className="min-h-screen gradient-bg flex items-center justify-center">
         <div className="text-center">

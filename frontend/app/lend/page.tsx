@@ -11,6 +11,7 @@ import { ARCANA_CRED_ABI, ARCANA_LEND_ABI, ERC20_ABI } from "@/lib/abis";
 import { CONTRACTS, EXPLORER } from "@/lib/wagmi";
 import { useTxFlow } from "@/lib/useTxFlow";
 import { toast } from "@/lib/toast";
+import { useMounted } from "@/lib/useMounted";
 
 const USDC_DECIMALS = 6;
 const formatUSDC = (v: bigint | undefined) =>
@@ -18,6 +19,7 @@ const formatUSDC = (v: bigint | undefined) =>
 const toUSDC = (v: string) => BigInt(Math.floor(parseFloat(v || "0") * 10 ** USDC_DECIMALS));
 
 export default function LendPage() {
+  const mounted = useMounted();
   const { address, isConnected } = useAccount();
   const [mode, setMode] = useState<"borrow" | "lend">("borrow");
   const [borrowAmount, setBorrowAmount] = useState("");
@@ -154,7 +156,7 @@ export default function LendPage() {
     }
   }
 
-  if (!isConnected) {
+  if (!mounted || !isConnected) {
     return (
       <div className="min-h-screen gradient-bg flex items-center justify-center">
         <div className="text-center">

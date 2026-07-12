@@ -6,6 +6,7 @@ import { NavBar } from "@/components/NavBar";
 import { ButtonLink } from "@/components/ui/Button";
 import { StatCard } from "@/components/ui/Card";
 import { EXPLORER } from "@/lib/wagmi";
+import { useMounted } from "@/lib/useMounted";
 
 const STATS = [
   { label: "Proofs Generated", value: "1,248" },
@@ -48,6 +49,7 @@ const TIER_CARDS = [
 ];
 
 export default function Home() {
+  const mounted = useMounted();
   const { isConnected } = useAccount();
 
   return (
@@ -87,7 +89,7 @@ export default function Home() {
         </p>
 
         <div className="flex items-center justify-center gap-4 flex-wrap">
-          {isConnected ? (
+          {mounted && isConnected ? (
             <ButtonLink href="/score" size="lg" className="glow-purple">
               Generate My ZK Proof →
             </ButtonLink>
