@@ -84,8 +84,14 @@ export default function ProfilePage() {
     return pledgeResults
       .map((r, i) => {
         if (r.status !== "success" || !r.result) return null;
-        const p = r.result as readonly [string, string, number, number, bigint, bigint, number, boolean];
-        return { id: i, pledgor: p[0], counterparty: p[1], currentTier: p[2], targetTier: p[3], deadline: Number(p[4]), premium: p[5], status: p[6] };
+        // viem decodes a single tuple return value whose components are ALL
+        // named (like ArcanaPledge.Pledge) into a plain named object, not an
+        // array — positional access like `p[0]` is silently `undefined`.
+        const p = r.result as unknown as {
+          pledgor: string; counterparty: string; currentTier: number; targetTier: number;
+          deadline: bigint; premium: bigint; status: number;
+        };
+        return { id: i, pledgor: p.pledgor, counterparty: p.counterparty, currentTier: p.currentTier, targetTier: p.targetTier, deadline: Number(p.deadline), premium: p.premium, status: p.status };
       })
       .filter((p): p is NonNullable<typeof p> => !!p)
       .filter((p) => p.pledgor.toLowerCase() === lower || p.counterparty.toLowerCase() === lower)

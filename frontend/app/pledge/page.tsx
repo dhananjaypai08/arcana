@@ -19,7 +19,20 @@ const toUSDC = (v: string) => BigInt(Math.floor(parseFloat(v || "0") * 10 ** USD
 
 const TIER_LABELS = ["None", "C", "B", "A"];
 
-type PledgeTuple = readonly [string, string, number, number, bigint, bigint, number, boolean];
+// viem decodes a single tuple/struct return value whose components are ALL
+// named (like ArcanaPledge.Pledge) into a plain named object, not an array —
+// so positional access like `p[0]` is silently `undefined`. Access fields by
+// name instead.
+interface PledgeStruct {
+  pledgor: string;
+  counterparty: string;
+  currentTier: number;
+  targetTier: number;
+  deadline: bigint;
+  premium: bigint;
+  status: number;
+  pledgorWon: boolean;
+}
 
 interface Pledge {
   id: number;
@@ -74,17 +87,17 @@ export default function PledgePage() {
     return pledgeResults
       .map((r, i) => {
         if (r.status !== "success" || !r.result) return null;
-        const p = r.result as unknown as PledgeTuple;
+        const p = r.result as unknown as PledgeStruct;
         return {
           id: i,
-          pledgor: p[0],
-          counterparty: p[1],
-          currentTier: p[2],
-          targetTier: p[3],
-          deadline: Number(p[4]),
-          premium: p[5],
-          status: p[6],
-          pledgorWon: p[7],
+          pledgor: p.pledgor,
+          counterparty: p.counterparty,
+          currentTier: p.currentTier,
+          targetTier: p.targetTier,
+          deadline: Number(p.deadline),
+          premium: p.premium,
+          status: p.status,
+          pledgorWon: p.pledgorWon,
         };
       })
       .filter((p): p is Pledge => p !== null)
