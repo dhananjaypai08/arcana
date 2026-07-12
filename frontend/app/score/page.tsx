@@ -64,9 +64,20 @@ export default function ScorePage() {
       setProofProgress(100);
       setProof(result);
 
-      if (result.success && result.tier && result.tier > 0 && CONTRACTS.arcanaCred) {
+      const canMintOnChain = result.success && result.tier && result.tier > 0 && CONTRACTS.arcanaCred;
+
+      if (canMintOnChain && result.proof_mode === "ezkl") {
         await handleMintCredential(result);
       } else {
+        if (canMintOnChain && result.proof_mode !== "ezkl") {
+          // A stub/demo proof can't pass the real on-chain Halo2 verifier —
+          // attempting to mint would just revert. Surface this clearly
+          // instead of firing a transaction that's guaranteed to fail.
+          toast.info(
+            "Demo mode proof",
+            "Real ZK proof generation was unavailable for this input, so no on-chain credential was minted. Your tier above is a preview only."
+          );
+        }
         setStep("done");
       }
     } catch (e) {

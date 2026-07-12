@@ -43,13 +43,13 @@ export const wagmiConfig = createConfig({
   // no ssr:true — all pages are client-side, avoids hydration mismatch
 });
 
-// HashKey Testnet deployed contract addresses (from deployments.json)
+// HashKey Testnet deployed contract addresses (from contracts/deployments.json)
 export const CONTRACTS = {
-  usdc:        process.env.NEXT_PUBLIC_USDC_ADDRESS    || "0x054ed45810DbBAb8B27668922D110669c9D88D0a",
-  verifier:    process.env.NEXT_PUBLIC_ARCANA_VERIFIER || "0x3BA5bDec11CF7780684B7588646c114a6120f15a",
-  arcanaCred:  process.env.NEXT_PUBLIC_ARCANA_CRED     || "0xF3f8246758F2A97e1D9fA12477768952Ca188AB1",
-  arcanaLend:  process.env.NEXT_PUBLIC_ARCANA_LEND     || "0xdFd2978db888C3eFe1e8f89bf97Ac4C34bDbDc90",
-  arcanaPledge:process.env.NEXT_PUBLIC_ARCANA_PLEDGE   || "0xDdd21a9f856C50ED7851608d0727224164E0f9b2",
+  usdc:        process.env.NEXT_PUBLIC_USDC_ADDRESS    || "0x770E1C48309e0e42d9aaA409042e7c77Cb30c9c5",
+  verifier:    process.env.NEXT_PUBLIC_ARCANA_VERIFIER || "0xd8611665C78345cFb47b3D3F16642C43e9E822Ed",
+  arcanaCred:  process.env.NEXT_PUBLIC_ARCANA_CRED     || "0xB5935FbE9BB2C769661a7ACE9EC6992D6C5Ca2C2",
+  arcanaLend:  process.env.NEXT_PUBLIC_ARCANA_LEND     || "0xB4B45E802Aedf148B87FeC835dFA3D2BA18a9982",
+  arcanaPledge:process.env.NEXT_PUBLIC_ARCANA_PLEDGE   || "0xac984E1275ffEC692479C8b91aF63365435330F5",
 } as const;
 
 export const PROOF_SERVER = process.env.NEXT_PUBLIC_PROOF_SERVER_URL || "http://localhost:8000";

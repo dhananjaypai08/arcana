@@ -39,11 +39,11 @@ The first zkML oracle on HashKey Chain. Prove your creditworthiness with a zero-
 
 | Contract | Address |
 |----------|---------|
-| Halo2Verifier (EZKL) | `0x3BA5bDec11CF7780684B7588646c114a6120f15a` |
-| ArcanaCred (ERC-5192) | `0xF3f8246758F2A97e1D9fA12477768952Ca188AB1` |
-| ArcanaLend | `0xdFd2978db888C3eFe1e8f89bf97Ac4C34bDbDc90` |
-| ArcanaPledge | `0xDdd21a9f856C50ED7851608d0727224164E0f9b2` |
-| USDC | `0x054ed45810DbBAb8B27668922D110669c9D88D0a` |
+| Halo2Verifier (EZKL) | `0xd8611665C78345cFb47b3D3F16642C43e9E822Ed` |
+| ArcanaCred (ERC-5192) | `0xB5935FbE9BB2C769661a7ACE9EC6992D6C5Ca2C2` |
+| ArcanaLend | `0xB4B45E802Aedf148B87FeC835dFA3D2BA18a9982` |
+| ArcanaPledge | `0xac984E1275ffEC692479C8b91aF63365435330F5` |
+| USDC (MockERC20) | `0x770E1C48309e0e42d9aaA409042e7c77Cb30c9c5` |
 
 Explorer: https://testnet-explorer.hsk.xyz
 

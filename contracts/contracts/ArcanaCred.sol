@@ -79,10 +79,14 @@ contract ArcanaCred is ERC721, IERC5192, Ownable {
     /**
      * @notice Mint or upgrade a soulbound credential by submitting a ZK proof.
      * @param proof   EZKL-generated proof bytes
-     * @param instances Public outputs from the ZK circuit (score value)
+     * @param instances Public instances from the ZK circuit: the first 6 are
+     *        the echoed model inputs (model_instance_shapes [1,6]) and the
+     *        final entry is the model's scalar output (model_instance_shapes
+     *        [1,1]) — see zkml/settings.json. The score is always the LAST
+     *        instance, never instances[0] (that's just the first input).
      *
-     * The proof asserts: CreditMLP(private_signals) = instances[0]
-     * The contract maps instances[0] to a tier and mints the credential.
+     * The proof asserts: CreditMLP(signals) = instances[instances.length - 1]
+     * The contract maps that output to a tier and mints the credential.
      */
     function mintTier(
         bytes calldata proof,
@@ -96,7 +100,7 @@ contract ArcanaCred is ERC721, IERC5192, Ownable {
             "ArcanaCred: ZK proof invalid"
         );
 
-        uint256 scoreOutput = instances[0];
+        uint256 scoreOutput = instances[instances.length - 1];
         uint8 tier = _computeTier(scoreOutput);
         require(tier > 0, "ArcanaCred: Score too low for any tier");
 

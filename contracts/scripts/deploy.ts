@@ -16,18 +16,18 @@ import * as path from "path";
 
 // HashKey Chain USDC (mainnet)
 const USDC_MAINNET = "0x054ed45810DbBAb8B27668922D110669c9D88D0a";
-// HashKey Chain testnet USDC (from HSP faucet)
-const USDC_TESTNET = "0x054ed45810DbBAb8B27668922D110669c9D88D0a"; // update if different
 
-// EZKL tier thresholds — these values come from ezkl_setup.py proof instances.
-// After running EZKL setup, check the proof.json instances[0] for a known score.
-// These are placeholder values; update after calibration.
-// EZKL encodes outputs as fixed-point field elements.
-// For a sigmoid output: ~0.5 → 0x8000... field element roughly
-// We use simplified thresholds here; the proof server script outputs the actual values.
-const TIER_C_THRESHOLD = ethers.parseUnits("5", 17);  // ~0.5 in EZKL scale
-const TIER_B_THRESHOLD = ethers.parseUnits("7", 17);  // ~0.7
-const TIER_A_THRESHOLD = ethers.parseUnits("85", 16); // ~0.85
+// EZKL tier thresholds, in the circuit's own fixed-point scale.
+// zkml/settings.json → run_args.output_scale = 13, so the circuit encodes a
+// float output `x` as round(x * 2^13) = round(x * 8192). The model's final
+// activation is a Sigmoid, so raw outputs live in [0, 8192).
+// These thresholds are calibrated against that scale (NOT the 0-1000 display
+// score the proof server shows off-chain, which is a separate linear
+// approximation used only for the UI preview before the real proof runs).
+const OUTPUT_SCALE = 8192;
+const TIER_C_THRESHOLD = Math.round(0.45 * OUTPUT_SCALE); // ~3686
+const TIER_B_THRESHOLD = Math.round(0.55 * OUTPUT_SCALE); // ~4506
+const TIER_A_THRESHOLD = Math.round(0.65 * OUTPUT_SCALE); // ~5325
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -41,8 +41,25 @@ async function main() {
   console.log(`Balance:    ${ethers.formatEther(balance)} ETH/HSK`);
   console.log("━".repeat(50));
 
-  const usdcAddress = network.chainId === 177n ? USDC_MAINNET : USDC_TESTNET;
-  console.log(`\nUSDC:       ${usdcAddress}`);
+  const isMainnet = network.chainId === 177n;
+  let usdcAddress: string;
+
+  if (isMainnet) {
+    usdcAddress = USDC_MAINNET;
+    console.log(`\nUSDC:       ${usdcAddress} (mainnet USDC)`);
+  } else {
+    // The real mainnet USDC address has no contract code on testnet — using
+    // it there makes every safeTransferFrom() call revert. Deploy a mintable
+    // mock USDC instead so deposit/borrow/pledge flows actually work.
+    console.log("\n📋 Deploying MockERC20 (testnet USDC stand-in)...");
+    const MockERC20 = await ethers.getContractFactory("MockERC20");
+    const mockUsdc = await MockERC20.deploy("Mock USD Coin", "USDC", 6);
+    await mockUsdc.waitForDeployment();
+    usdcAddress = await mockUsdc.getAddress();
+    console.log(`   ✅ MockERC20 (USDC):    ${usdcAddress}`);
+    console.log(`   💰 Minted 1,000,000 USDC to deployer (${deployer.address})`);
+    console.log(`      Use mockUsdc.mint(address, amount) to fund other test accounts.`);
+  }
 
   // ── 1. Deploy Verifier ────────────────────────────────────────────────
 

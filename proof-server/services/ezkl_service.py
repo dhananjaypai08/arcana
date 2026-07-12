@@ -10,7 +10,10 @@ import os
 import json
 import tempfile
 import hashlib
+import multiprocessing as mp
 from pathlib import Path
+
+from fastapi.concurrency import run_in_threadpool
 
 # Paths relative to the zkml directory
 ZKML_DIR = Path(__file__).parent.parent.parent / "zkml"
@@ -19,6 +22,23 @@ PK_PATH = ZKML_DIR / "pk.key"
 VK_PATH = ZKML_DIR / "vk.key"
 SETTINGS_PATH = ZKML_DIR / "settings.json"
 SRS_PATH = ZKML_DIR / "kzg.srs"
+
+# Hard ceiling on a single proof attempt. EZKL's Halo2 prover is normally
+# sub-second for this circuit, but certain input values have been observed to
+# make the underlying Rust prover hang indefinitely — and with near-zero CPU
+# usage while it hangs, which means it is likely holding the Python GIL the
+# entire time (blocked on a native mutex/condvar/channel without releasing
+# it back to Python). That makes a plain worker-thread offload useless: the
+# GIL-holding hang freezes every other thread in the process too, including
+# the asyncio event loop, so the whole server appears dead.
+#
+# The only reliable fix is to run each proof attempt in its own OS process
+# (spawned fresh, not forked, to avoid inheriting the running event loop) so
+# that on timeout we can forcibly kill -9 it and fully reclaim the server —
+# a hang can now only ever affect the one request that triggered it.
+# Kept short (well above the sub-second time a healthy proof actually takes)
+# so a live demo degrades to demo mode quickly instead of stalling on stage.
+EZKL_PROVE_TIMEOUT_SECONDS = 12
 
 
 def is_ezkl_ready() -> bool:
@@ -38,15 +58,78 @@ async def generate_proof(features: list[float]) -> dict:
     """
     Generate a ZK proof for the given 6 credit features.
     Uses EZKL if available, otherwise falls back to demo mode.
+
+    The real EZKL work always runs in an isolated subprocess with a hard
+    timeout. If it doesn't finish in time, the subprocess is killed and we
+    fall back to a demo-mode proof — a single slow/stuck input can no longer
+    freeze the server or leave the UI stuck forever.
     """
-    if is_ezkl_ready():
-        return await _generate_ezkl_proof(features)
-    else:
+    if not is_ezkl_ready():
         return _generate_demo_proof(features)
 
+    status, payload = await run_in_threadpool(
+        _run_ezkl_in_subprocess, features, EZKL_PROVE_TIMEOUT_SECONDS
+    )
 
-async def _generate_ezkl_proof(features: list[float]) -> dict:
-    """Generate a real EZKL ZK proof (EZKL 23.x — get_srs is async, rest are sync)."""
+    if status == "ok":
+        return payload
+
+    result = _generate_demo_proof(features)
+    if status == "timeout":
+        result["_note"] = (
+            f"EZKL proof generation exceeded {EZKL_PROVE_TIMEOUT_SECONDS}s for this input; "
+            "the worker was terminated and a demo-mode proof was served instead."
+        )
+    else:
+        result["_note"] = f"EZKL proof generation failed ({payload}); served a demo-mode proof instead."
+    return result
+
+
+def _run_ezkl_in_subprocess(features: list[float], timeout: float) -> tuple[str, object]:
+    """
+    Run `_generate_ezkl_proof_sync` in a fresh child process and enforce a
+    hard wall-clock timeout, killing the child if it's exceeded.
+
+    Returns ("ok", result_dict), ("timeout", None), or ("error", message).
+    Runs inside FastAPI's threadpool (blocking `process.join()` is fine there
+    — it's plain stdlib code, so it correctly releases the GIL while waiting,
+    unlike the EZKL call itself).
+    """
+    ctx = mp.get_context("spawn")
+    result_queue: mp.Queue = ctx.Queue()
+    process = ctx.Process(target=_ezkl_subprocess_entrypoint, args=(features, result_queue))
+    process.start()
+    process.join(timeout)
+
+    if process.is_alive():
+        process.terminate()
+        process.join(2)
+        if process.is_alive():
+            process.kill()
+            process.join()
+        return ("timeout", None)
+
+    if not result_queue.empty():
+        return result_queue.get()
+    return ("error", f"worker exited with code {process.exitcode} and no result")
+
+
+def _ezkl_subprocess_entrypoint(features: list[float], result_queue: "mp.Queue") -> None:
+    """Entrypoint for the child process — must be a module-level function to be picklable."""
+    try:
+        result = _generate_ezkl_proof_sync(features)
+        result_queue.put(("ok", result))
+    except Exception as e:  # noqa: BLE001 — surface any failure back to the parent
+        result_queue.put(("error", str(e)))
+
+
+def _generate_ezkl_proof_sync(features: list[float]) -> dict:
+    """Generate a real EZKL ZK proof (EZKL 23.x — get_srs is async, rest are sync).
+
+    Only ever called from inside the isolated subprocess spawned by
+    `_run_ezkl_in_subprocess` — never call this directly from the server
+    process, since a hang here can freeze the whole interpreter (GIL).
+    """
     import ezkl
     from eth_abi import decode as abi_decode
 

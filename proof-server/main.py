@@ -4,10 +4,17 @@ FastAPI server that generates EZKL ZK proofs for credit scoring,
 gated behind HSP x402 payments.
 """
 
+import os
+from dotenv import load_dotenv
+
+# Must run before any route/service module reads its env vars — several
+# (e.g. HASHKEY_RPC, HSP_* settings) were previously read from the shell
+# environment only because nothing ever loaded the local .env file.
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-import os
 
 from routes.proof import router as proof_router
 from routes.score import router as score_router
