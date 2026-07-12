@@ -12,7 +12,11 @@ const HASHKEY_TESTNET = {
   blockExplorerUrls: ["https://testnet-explorer.hsk.xyz"],
 };
 
-export function ConnectWallet({ showBalance = false }: { showBalance?: boolean }) {
+interface Eip1193Provider {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+}
+
+export function ConnectWallet() {
   const { address, isConnected, chainId } = useAccount();
   const { connect, connectors, isPending, error } = useConnect();
   const { disconnect } = useDisconnect();
@@ -22,6 +26,7 @@ export function ConnectWallet({ showBalance = false }: { showBalance?: boolean }
   const [showPicker, setShowPicker] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- required mount guard to avoid SSR/client hydration mismatch for wallet state
     setMounted(true);
   }, []);
 
@@ -115,7 +120,8 @@ export function ConnectWallet({ showBalance = false }: { showBalance?: boolean }
       } catch {
         // Chain not known to wallet yet — ask it to add + switch in one step
         try {
-          await (window.ethereum as any)?.request({
+          const provider = window.ethereum as Eip1193Provider | undefined;
+          await provider?.request({
             method: "wallet_addEthereumChain",
             params: [HASHKEY_TESTNET],
           });

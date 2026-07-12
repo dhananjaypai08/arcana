@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useAccount } from "wagmi";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import { ConnectWallet } from "@/components/ConnectWallet";
+import { NavBar } from "@/components/NavBar";
+import { ButtonLink } from "@/components/ui/Button";
+import { StatCard } from "@/components/ui/Card";
+import { EXPLORER } from "@/lib/wagmi";
 
 const STATS = [
   { label: "Proofs Generated", value: "1,248" },
@@ -47,14 +48,7 @@ const TIER_CARDS = [
 ];
 
 export default function Home() {
-  const { address, isConnected } = useAccount();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (isConnected && address) {
-      // Auto-redirect to score page after connecting
-    }
-  }, [isConnected, address]);
+  const { isConnected } = useAccount();
 
   return (
     <div className="min-h-screen gradient-bg relative overflow-hidden">
@@ -67,39 +61,26 @@ export default function Home() {
         }}
       />
 
-      {/* Nav */}
-      <nav className="relative z-10 flex items-center justify-between px-6 py-5 border-b border-white/5">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center text-sm font-bold">A</div>
-          <span className="font-bold text-white tracking-tight">ARCANA</span>
-          <span className="text-xs text-white/30 font-mono">PROTOCOL</span>
-        </div>
-        <div className="flex items-center gap-6">
-          <Link href="/score" className="text-sm text-white/60 hover:text-white transition-colors">Score</Link>
-          <Link href="/lend" className="text-sm text-white/60 hover:text-white transition-colors">Lend</Link>
-          <Link href="/pledge" className="text-sm text-white/60 hover:text-white transition-colors">Pledge</Link>
-          <ConnectWallet />
-        </div>
-      </nav>
+      <NavBar />
 
       {/* Hero */}
       <section className="relative z-10 max-w-6xl mx-auto px-6 pt-28 pb-20 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-300 text-xs font-mono mb-8">
           <span className="w-1.5 h-1.5 rounded-full bg-violet-400 pulse-dot" />
-          HashKey Chain Mainnet · zkML Powered · First Deployment
+          HashKey Chain Testnet · zkML Powered
         </div>
 
         <h1 className="text-6xl md:text-7xl font-bold tracking-tight mb-6 leading-tight">
-          <span className="text-white">Invisible inputs.</span>
+          <span className="text-primary">Invisible inputs.</span>
           <br />
           <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-400 bg-clip-text text-transparent">
             Verifiable outputs.
           </span>
           <br />
-          <span className="text-white/60">Tradeable facts.</span>
+          <span className="text-secondary">Tradeable facts.</span>
         </h1>
 
-        <p className="text-xl text-white/50 max-w-2xl mx-auto mb-12 leading-relaxed">
+        <p className="text-xl text-secondary max-w-2xl mx-auto mb-12 leading-relaxed">
           ARCANA uses zero-knowledge machine learning to prove your DeFi creditworthiness
           without revealing your data. Your ZK credential unlocks under-collateralized borrowing
           and a new market — betting on your own improvement.
@@ -107,21 +88,15 @@ export default function Home() {
 
         <div className="flex items-center justify-center gap-4 flex-wrap">
           {isConnected ? (
-            <Link
-              href="/score"
-              className="px-8 py-4 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-xl transition-all glow-purple text-lg"
-            >
+            <ButtonLink href="/score" size="lg" className="glow-purple">
               Generate My ZK Proof →
-            </Link>
+            </ButtonLink>
           ) : (
             <ConnectWallet />
           )}
-          <Link
-            href="/pledge"
-            className="px-8 py-4 glass text-white/80 hover:text-white font-semibold rounded-xl transition-all text-lg"
-          >
+          <ButtonLink href="/pledge" size="lg" variant="secondary">
             View Pledge Market
-          </Link>
+          </ButtonLink>
         </div>
       </section>
 
@@ -129,18 +104,15 @@ export default function Home() {
       <section className="relative z-10 max-w-4xl mx-auto px-6 pb-16">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {STATS.map((s) => (
-            <div key={s.label} className="glass rounded-2xl p-5 text-center">
-              <div className="text-2xl font-bold text-white mb-1">{s.value}</div>
-              <div className="text-xs text-white/40 font-mono uppercase tracking-wider">{s.label}</div>
-            </div>
+            <StatCard key={s.label} label={s.label} value={s.value} />
           ))}
         </div>
       </section>
 
       {/* How it works */}
       <section className="relative z-10 max-w-6xl mx-auto px-6 pb-20">
-        <h2 className="text-3xl font-bold text-center mb-4">How ARCANA Works</h2>
-        <p className="text-white/40 text-center mb-12 max-w-xl mx-auto">
+        <h2 className="text-3xl font-bold text-center mb-4 text-primary">How ARCANA Works</h2>
+        <p className="text-muted text-center mb-12 max-w-xl mx-auto">
           A 3-step flow from private signals to on-chain credit
         </p>
         <div className="grid md:grid-cols-3 gap-6">
@@ -167,8 +139,8 @@ export default function Home() {
             <div key={item.step} className="glass rounded-2xl p-8 relative">
               <div className="text-4xl mb-4">{item.icon}</div>
               <div className="text-xs font-mono text-violet-400 mb-2">{item.step}</div>
-              <h3 className="text-lg font-bold mb-3">{item.title}</h3>
-              <p className="text-white/50 text-sm leading-relaxed">{item.desc}</p>
+              <h3 className="text-lg font-bold mb-3 text-primary">{item.title}</h3>
+              <p className="text-secondary text-sm leading-relaxed">{item.desc}</p>
             </div>
           ))}
         </div>
@@ -176,8 +148,8 @@ export default function Home() {
 
       {/* Tiers */}
       <section className="relative z-10 max-w-6xl mx-auto px-6 pb-20">
-        <h2 className="text-3xl font-bold text-center mb-4">Credential Tiers</h2>
-        <p className="text-white/40 text-center mb-12 max-w-xl mx-auto">
+        <h2 className="text-3xl font-bold text-center mb-4 text-primary">Credential Tiers</h2>
+        <p className="text-muted text-center mb-12 max-w-xl mx-auto">
           Your ZK-proven credit score determines your borrowing power
         </p>
         <div className="grid md:grid-cols-3 gap-6">
@@ -190,16 +162,16 @@ export default function Home() {
                 <span className={`px-3 py-1 rounded-lg text-sm font-bold ${t.badge}`}>
                   TIER {t.tier}
                 </span>
-                <span className="text-white/40 text-sm font-mono">{t.score}</span>
+                <span className="text-muted text-sm font-mono">{t.score}</span>
               </div>
-              <div className="text-4xl font-bold text-white mb-2">{t.ratio}</div>
-              <div className="text-white/40 text-sm mb-4">Collateral Required</div>
-              <p className="text-white/60 text-sm leading-relaxed">{t.desc}</p>
+              <div className="text-4xl font-bold text-primary mb-2">{t.ratio}</div>
+              <div className="text-muted text-sm mb-4">Collateral Required</div>
+              <p className="text-secondary text-sm leading-relaxed">{t.desc}</p>
             </div>
           ))}
         </div>
-        <div className="mt-4 text-center text-white/30 text-sm">
-          Standard DeFi: <span className="text-white/50 line-through">150%</span> collateral required for any borrow
+        <div className="mt-4 text-center text-muted text-sm">
+          Standard DeFi: <span className="text-secondary line-through">150%</span> collateral required for any borrow
         </div>
       </section>
 
@@ -207,27 +179,24 @@ export default function Home() {
       <section className="relative z-10 max-w-4xl mx-auto px-6 pb-24">
         <div className="glass-dark rounded-3xl p-10 text-center border border-violet-500/20">
           <div className="text-xs font-mono text-violet-400 mb-3 uppercase tracking-widest">Novel Financial Primitive</div>
-          <h2 className="text-3xl font-bold mb-4">Bet on Your Future Self</h2>
-          <p className="text-white/50 max-w-lg mx-auto mb-8 leading-relaxed">
-            The ARCANA Pledge Market lets you tokenize self-improvement. Pledge to reach a higher 
-            credit tier, earn a premium if you succeed — all settled trustlessly by ZK proofs. 
+          <h2 className="text-3xl font-bold mb-4 text-primary">Bet on Your Future Self</h2>
+          <p className="text-secondary max-w-lg mx-auto mb-8 leading-relaxed">
+            The ARCANA Pledge Market lets you tokenize self-improvement. Pledge to reach a higher
+            credit tier, earn a premium if you succeed — all settled trustlessly by ZK proofs.
             A derivatives market on personal attributes that has never existed before.
           </p>
-          <Link
-            href="/pledge"
-            className="inline-flex px-6 py-3 bg-violet-600/30 border border-violet-500/40 hover:bg-violet-600/50 text-violet-300 font-semibold rounded-xl transition-all"
-          >
+          <ButtonLink href="/pledge" variant="secondary">
             Explore Pledge Market →
-          </Link>
+          </ButtonLink>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-white/5 px-6 py-8 text-center text-white/20 text-sm">
-        <div className="flex items-center justify-center gap-6 mb-4">
-          <span className="font-mono">HashKey Chain · ChainID 177</span>
+      <footer className="relative z-10 border-t border-white/5 px-6 py-8 text-center text-muted text-sm">
+        <div className="flex items-center justify-center gap-6 mb-4 flex-wrap">
+          <span className="font-mono">HashKey Chain Testnet · ChainID 133</span>
           <span>|</span>
-          <a href="https://explorer.hsk.xyz" target="_blank" rel="noreferrer" className="hover:text-white/60 transition-colors">
+          <a href={EXPLORER} target="_blank" rel="noreferrer" className="hover:text-secondary transition-colors">
             Explorer ↗
           </a>
           <span>|</span>
@@ -235,7 +204,7 @@ export default function Home() {
         </div>
         <p>ARCANA Protocol · HashKey Chain Horizon Hackathon 2026</p>
         <p className="mt-2 text-white/10 font-mono text-xs">
-          "Truth is the new collateral. We proved it with math."
+          &ldquo;Truth is the new collateral. We proved it with math.&rdquo;
         </p>
       </footer>
     </div>

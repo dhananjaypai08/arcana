@@ -1,25 +1,38 @@
 "use client";
 
-import { useState } from "react";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import Link from "next/link";
+import { useMemo, useState } from "react";
+import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import { ConnectWallet } from "@/components/ConnectWallet";
+import { NavBar } from "@/components/NavBar";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { StatusBadge, TierBadge } from "@/components/ui/Badge";
 import { ARCANA_PLEDGE_ABI, ERC20_ABI } from "@/lib/abis";
-import { CONTRACTS } from "@/lib/wagmi";
+import { CONTRACTS, EXPLORER } from "@/lib/wagmi";
+import { useTxFlow } from "@/lib/useTxFlow";
+import { toast } from "@/lib/toast";
 
 const USDC_DECIMALS = 6;
 const formatUSDC = (v: bigint) => (Number(v) / 10 ** USDC_DECIMALS).toFixed(2);
+const toUSDC = (v: string) => BigInt(Math.floor(parseFloat(v || "0") * 10 ** USDC_DECIMALS));
 
 const TIER_LABELS = ["None", "C", "B", "A"];
-const TIER_COLORS = ["text-white/40", "text-amber-500", "text-slate-300", "text-yellow-400"];
-const STATUS_LABELS = ["Open", "Matched", "Resolved", "Expired"];
 
-// Demo pledges when no contract is deployed
-const DEMO_PLEDGES = [
-  { id: 0, pledgor: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", counterparty: "0x0000", currentTier: 1, targetTier: 2, deadline: Date.now() / 1000 + 86400 * 20, premium: 10_000_000n, status: 0, pledgorWon: false },
-  { id: 1, pledgor: "0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B", counterparty: "0x1234", currentTier: 2, targetTier: 3, deadline: Date.now() / 1000 + 86400 * 25, premium: 25_000_000n, status: 1, pledgorWon: false },
-  { id: 2, pledgor: "0x742d35Cc6634C0532925a3b8D4C9D5C2A44b3B2d", counterparty: "0x0000", currentTier: 1, targetTier: 3, deadline: Date.now() / 1000 + 86400 * 28, premium: 50_000_000n, status: 0, pledgorWon: false },
-];
+type PledgeTuple = readonly [string, string, number, number, bigint, bigint, number, boolean];
+
+interface Pledge {
+  id: number;
+  pledgor: string;
+  counterparty: string;
+  currentTier: number;
+  targetTier: number;
+  deadline: number;
+  premium: bigint;
+  status: number;
+  pledgorWon: boolean;
+}
+
+const STATUS_LABELS = ["open", "matched", "resolved", "expired"] as const;
 
 export default function PledgePage() {
   const { address, isConnected } = useAccount();
@@ -28,93 +41,152 @@ export default function PledgePage() {
   const [targetTier, setTargetTier] = useState(2);
   const [days, setDays] = useState(30);
   const [premium, setPremium] = useState("10");
-  const [txStatus, setTxStatus] = useState<"idle" | "approving" | "tx" | "done">("idle");
+  const [busyPledgeId, setBusyPledgeId] = useState<number | null>(null);
 
-  const { writeContract, data: txHash } = useWriteContract();
-  const { isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+  const create = useTxFlow();
+  const take = useTxFlow();
 
-  const { data: totalPledges } = useReadContract({
+  const pledgeDeployed = !!CONTRACTS.arcanaPledge;
+
+  const { data: totalPledges, refetch: refetchTotal } = useReadContract({
     address: CONTRACTS.arcanaPledge as `0x${string}`,
     abi: ARCANA_PLEDGE_ABI,
     functionName: "totalPledges",
-    query: { enabled: !!CONTRACTS.arcanaPledge },
+    query: { enabled: pledgeDeployed },
   });
 
-  const pledges = DEMO_PLEDGES; // In production: fetch from contract events/subgraph
+  const count = totalPledges ? Number(totalPledges) : 0;
+
+  const { data: pledgeResults, refetch: refetchPledges } = useReadContracts({
+    contracts: Array.from({ length: count }, (_, i) => ({
+      address: CONTRACTS.arcanaPledge as `0x${string}`,
+      abi: ARCANA_PLEDGE_ABI,
+      functionName: "getPledge",
+      args: [BigInt(i)],
+    })),
+    query: { enabled: pledgeDeployed && count > 0 },
+  });
+
+  const pledges: Pledge[] = useMemo(() => {
+    if (!pledgeResults) return [];
+    return pledgeResults
+      .map((r, i) => {
+        if (r.status !== "success" || !r.result) return null;
+        const p = r.result as unknown as PledgeTuple;
+        return {
+          id: i,
+          pledgor: p[0],
+          counterparty: p[1],
+          currentTier: p[2],
+          targetTier: p[3],
+          deadline: Number(p[4]),
+          premium: p[5],
+          status: p[6],
+          pledgorWon: p[7],
+        };
+      })
+      .filter((p): p is Pledge => p !== null)
+      .sort((a, b) => b.id - a.id);
+  }, [pledgeResults]);
+
+  async function refreshAll() {
+    await Promise.all([refetchTotal(), refetchPledges()]);
+  }
 
   async function handleCreatePledge() {
-    if (!CONTRACTS.arcanaPledge) {
-      alert("ArcanaPledge not deployed yet");
+    if (!pledgeDeployed || !address) {
+      toast.error("ArcanaPledge not deployed yet");
       return;
     }
-    const premiumAmount = BigInt(Math.floor(parseFloat(premium) * 10 ** USDC_DECIMALS));
+    const premiumAmount = toUSDC(premium);
+    if (premiumAmount <= 0n) {
+      toast.error("Enter a valid premium amount");
+      return;
+    }
 
-    setTxStatus("approving");
-    try {
-      writeContract({
+    const ok = await create.run([
+      {
+        label: "Approve USDC",
         address: CONTRACTS.usdc as `0x${string}`,
         abi: ERC20_ABI,
         functionName: "approve",
         args: [CONTRACTS.arcanaPledge as `0x${string}`, premiumAmount],
-      });
-      setTxStatus("tx");
-    } catch (e: any) {
-      alert(e.message);
-      setTxStatus("idle");
+      },
+      {
+        label: "Create Pledge",
+        address: CONTRACTS.arcanaPledge as `0x${string}`,
+        abi: ARCANA_PLEDGE_ABI,
+        functionName: "createPledge",
+        args: [currentTier, targetTier, days, premiumAmount],
+      },
+    ]);
+
+    if (ok) {
+      toast.success("Pledge created!", "Your pledge is now open for a counterparty");
+      setShowCreate(false);
+      create.reset();
+      await refreshAll();
     }
   }
 
-  async function handleTakePledge(pledgeId: number, pledgePremium: bigint) {
-    if (!CONTRACTS.arcanaPledge) {
-      alert("ArcanaPledge not deployed yet");
+  async function handleTakePledge(pledge: Pledge) {
+    if (!pledgeDeployed || !address) {
+      toast.error("ArcanaPledge not deployed yet");
       return;
     }
-    try {
-      writeContract({
+    setBusyPledgeId(pledge.id);
+    const ok = await take.run([
+      {
+        label: "Approve USDC",
         address: CONTRACTS.usdc as `0x${string}`,
         abi: ERC20_ABI,
         functionName: "approve",
-        args: [CONTRACTS.arcanaPledge as `0x${string}`, pledgePremium],
-      });
-    } catch (e: any) {
-      alert(e.message);
+        args: [CONTRACTS.arcanaPledge as `0x${string}`, pledge.premium],
+      },
+      {
+        label: "Take Counterparty",
+        address: CONTRACTS.arcanaPledge as `0x${string}`,
+        abi: ARCANA_PLEDGE_ABI,
+        functionName: "takePledge",
+        args: [BigInt(pledge.id)],
+      },
+    ]);
+
+    if (ok) {
+      toast.success("You're now the counterparty!", `Pledge #${pledge.id} matched`);
+      take.reset();
+      await refreshAll();
     }
+    setBusyPledgeId(null);
   }
+
+  const isCreating = create.status === "pending";
 
   return (
     <div className="min-h-screen gradient-bg">
-      <nav className="flex items-center justify-between px-6 py-5 border-b border-white/5">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center text-xs font-bold">A</div>
-          <span className="font-bold text-white">ARCANA</span>
-        </Link>
-        <div className="flex items-center gap-4">
-          <Link href="/score" className="text-sm text-white/50 hover:text-white">Score</Link>
-          <Link href="/lend" className="text-sm text-white/50 hover:text-white">Lend</Link>
-          <ConnectWallet />
-        </div>
-      </nav>
+      <NavBar active="pledge" />
 
       <main className="max-w-5xl mx-auto px-6 py-12">
-        <div className="flex items-start justify-between mb-8">
+        <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Pledge Market</h1>
-            <p className="text-white/40 max-w-xl">
+            <h1 className="text-3xl font-bold mb-2 text-primary">Pledge Market</h1>
+            <p className="text-secondary max-w-xl">
               Bet on your own improvement. Pledge to reach a higher ZK credit tier — earn a premium if you succeed, settled trustlessly by zero-knowledge proofs.
             </p>
           </div>
           {isConnected && (
-            <button
-              onClick={() => setShowCreate(!showCreate)}
-              className="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-xl transition-all text-sm whitespace-nowrap"
-            >
-              + Create Pledge
-            </button>
+            <Button onClick={() => setShowCreate(!showCreate)}>+ Create Pledge</Button>
           )}
         </div>
 
+        {!pledgeDeployed && (
+          <div className="mb-8 p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 text-sm">
+            ArcanaPledge contract address is not configured — pledges are read-only until deployed.
+          </div>
+        )}
+
         {/* Info cards */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           {[
             { label: "Novel Primitive", desc: "First derivatives market on ZK-proven personal attributes" },
             { label: "Trustless Settlement", desc: "ZK proofs resolve pledges — no human arbitration" },
@@ -122,166 +194,173 @@ export default function PledgePage() {
           ].map((c) => (
             <div key={c.label} className="glass rounded-2xl p-4">
               <div className="text-xs font-mono text-violet-400 mb-1">{c.label}</div>
-              <p className="text-xs text-white/50">{c.desc}</p>
+              <p className="text-xs text-secondary">{c.desc}</p>
             </div>
           ))}
         </div>
 
         {/* Create pledge modal */}
         {showCreate && (
-          <div className="glass rounded-2xl p-6 mb-8 border border-violet-500/20">
-            <h3 className="font-bold mb-4">Create New Pledge</h3>
+          <Card className="mb-8 border border-violet-500/20">
+            <h3 className="font-bold mb-4 text-primary">Create New Pledge</h3>
             <div className="grid md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="text-xs text-white/40 mb-2 block">Current Tier</label>
+                <label className="text-xs text-muted mb-2 block">Current Tier</label>
                 <select
                   value={currentTier}
                   onChange={(e) => setCurrentTier(Number(e.target.value))}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-primary focus:outline-none focus:border-violet-500"
                 >
                   <option value={1}>Tier C (120% ratio)</option>
                   <option value={2}>Tier B (90% ratio)</option>
                 </select>
               </div>
               <div>
-                <label className="text-xs text-white/40 mb-2 block">Target Tier</label>
+                <label className="text-xs text-muted mb-2 block">Target Tier</label>
                 <select
                   value={targetTier}
                   onChange={(e) => setTargetTier(Number(e.target.value))}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-primary focus:outline-none focus:border-violet-500"
                 >
                   {currentTier < 2 && <option value={2}>Tier B (90% ratio)</option>}
                   <option value={3}>Tier A (70% ratio)</option>
                 </select>
               </div>
               <div>
-                <label className="text-xs text-white/40 mb-2 block">Days to Achieve</label>
+                <label className="text-xs text-muted mb-2 block">Days to Achieve</label>
                 <input
                   type="number"
                   value={days}
                   onChange={(e) => setDays(Number(e.target.value))}
                   min={7} max={90}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-primary focus:outline-none focus:border-violet-500"
                 />
               </div>
               <div>
-                <label className="text-xs text-white/40 mb-2 block">Premium (USDC each side)</label>
+                <label className="text-xs text-muted mb-2 block">Premium (USDC each side)</label>
                 <input
                   type="number"
                   value={premium}
                   onChange={(e) => setPremium(e.target.value)}
                   min={1}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-violet-500"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-primary focus:outline-none focus:border-violet-500"
                 />
               </div>
             </div>
 
-            <div className="bg-white/4 rounded-xl p-4 text-xs mb-4">
-              <div className="text-white/60 mb-2">Pledge summary:</div>
-              <p className="text-white/80">
-                "I pledge to improve from Tier {TIER_LABELS[currentTier]} → Tier {TIER_LABELS[targetTier]} within {days} days.
+            <div className="bg-white/[4%] rounded-xl p-4 text-xs mb-4">
+              <div className="text-secondary mb-2">Pledge summary:</div>
+              <p className="text-secondary">
+                &ldquo;I pledge to improve from Tier {TIER_LABELS[currentTier]} → Tier {TIER_LABELS[targetTier]} within {days} days.
                 I deposit {premium} USDC. If a counterparty matches, we each stake {premium} USDC.
-                I submit a ZK proof at deadline — if I've reached Tier {TIER_LABELS[targetTier]}, I win {Number(premium) * 2 * 0.98} USDC."
+                I submit a ZK proof at deadline — if I&apos;ve reached Tier {TIER_LABELS[targetTier]}, I win {(Number(premium) * 2 * 0.98).toFixed(2)} USDC.&rdquo;
               </p>
             </div>
 
+            {isCreating && (
+              <div className="mb-4 p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 text-sm text-violet-300 flex items-center gap-3">
+                <span className="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+                Step {create.stepIndex}/{create.totalSteps}: {create.stepLabel}...
+              </div>
+            )}
+            {create.status === "error" && create.error && (
+              <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+                {create.error}
+              </div>
+            )}
+
             <div className="flex gap-3">
-              <button
-                onClick={handleCreatePledge}
-                disabled={txStatus !== "idle"}
-                className="px-6 py-3 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold rounded-xl transition-all"
-              >
-                {txStatus === "approving" ? "Approving USDC..." : txStatus === "tx" ? "Creating..." : "Create Pledge"}
-              </button>
-              <button
-                onClick={() => setShowCreate(false)}
-                className="px-6 py-3 glass text-white/60 hover:text-white font-semibold rounded-xl transition-all"
-              >
+              <Button onClick={handleCreatePledge} loading={isCreating} disabled={isCreating}>
+                {isCreating ? create.stepLabel : "Create Pledge"}
+              </Button>
+              <Button variant="secondary" onClick={() => { setShowCreate(false); create.reset(); }} disabled={isCreating}>
                 Cancel
-              </button>
+              </Button>
             </div>
 
-            {txHash && (
-              <a href={`https://testnet-explorer.hsk.xyz/tx/${txHash}`} target="_blank" rel="noreferrer"
+            {create.txHash && (
+              <a href={`${EXPLORER}/tx/${create.txHash}`} target="_blank" rel="noreferrer"
                 className="mt-2 block text-xs text-violet-400 font-mono">
-                Tx: {txHash.slice(0, 16)}... ↗
+                Tx: {create.txHash.slice(0, 16)}... ↗
               </a>
             )}
-          </div>
+          </Card>
         )}
 
         {/* Pledge list */}
         <div className="space-y-4">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="font-semibold">Open Pledges</h2>
-            <span className="text-xs text-white/30 font-mono">
-              {totalPledges ? Number(totalPledges) : pledges.length} total on-chain
-            </span>
+            <h2 className="font-semibold text-primary">Open Pledges</h2>
+            <span className="text-xs text-muted font-mono">{count} total on-chain</span>
           </div>
 
+          {pledges.length === 0 && (
+            <Card className="text-center py-10">
+              <p className="text-muted">
+                {pledgeDeployed ? "No pledges yet — be the first to create one." : "Pledge contract not deployed."}
+              </p>
+            </Card>
+          )}
+
           {pledges.map((pledge) => {
+            // eslint-disable-next-line react-hooks/purity -- deadline countdown is inherently time-based
             const daysLeft = Math.max(0, Math.round((pledge.deadline - Date.now() / 1000) / 86400));
             const isOpen = pledge.status === 0;
             const isMatched = pledge.status === 1;
+            const isMine = address && address.toLowerCase() === pledge.pledgor.toLowerCase();
+            const isCounterparty = address && address.toLowerCase() === pledge.counterparty.toLowerCase();
+            const isTaking = take.status === "pending" && busyPledgeId === pledge.id;
+
             return (
-              <div key={pledge.id} className="glass rounded-2xl p-6">
-                <div className="flex items-start justify-between mb-4">
+              <Card key={pledge.id}>
+                <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
                   <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                        pledge.currentTier === 2 ? "bg-slate-600 text-white" : "bg-amber-900 text-white"
-                      }`}>
-                        Tier {TIER_LABELS[pledge.currentTier]}
-                      </span>
-                      <span className="text-white/30 text-sm">→</span>
-                      <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                        pledge.targetTier === 3 ? "bg-yellow-500 text-black" : "bg-slate-400 text-black"
-                      }`}>
-                        Tier {TIER_LABELS[pledge.targetTier]}
-                      </span>
-                      <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-                        isOpen ? "bg-green-500/20 text-green-400" :
-                        isMatched ? "bg-blue-500/20 text-blue-400" :
-                        "bg-white/10 text-white/40"
-                      }`}>
-                        {STATUS_LABELS[pledge.status]}
-                      </span>
+                    <div className="flex items-center gap-3 mb-1 flex-wrap">
+                      <TierBadge tier={pledge.currentTier} size="sm" />
+                      <span className="text-muted text-sm">→</span>
+                      <TierBadge tier={pledge.targetTier} size="sm" />
+                      <StatusBadge status={STATUS_LABELS[pledge.status]} />
+                      {isMine && <span className="text-xs text-violet-400">You created this</span>}
+                      {isCounterparty && <span className="text-xs text-violet-400">You&apos;re the counterparty</span>}
                     </div>
-                    <div className="text-xs text-white/30 font-mono">
+                    <div className="text-xs text-muted font-mono">
                       {pledge.pledgor.slice(0, 8)}...{pledge.pledgor.slice(-6)}
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xl font-bold text-white">{formatUSDC(pledge.premium)} USDC</div>
-                    <div className="text-xs text-white/30">each side</div>
+                    <div className="text-xl font-bold text-primary">{formatUSDC(pledge.premium)} USDC</div>
+                    <div className="text-xs text-muted">each side</div>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 text-xs text-white/40">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-4 text-xs text-secondary">
                     <span>⏱ {daysLeft} days left</span>
                     <span>💰 Winner gets {(Number(pledge.premium) / 10 ** USDC_DECIMALS * 2 * 0.98).toFixed(2)} USDC</span>
                   </div>
-                  {isOpen && address && address.toLowerCase() !== pledge.pledgor.toLowerCase() && (
-                    <button
-                      onClick={() => handleTakePledge(pledge.id, pledge.premium)}
-                      className="px-4 py-2 bg-violet-600/30 border border-violet-500/30 hover:bg-violet-600/50 text-violet-300 text-sm font-semibold rounded-xl transition-all"
+                  {isOpen && address && !isMine && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleTakePledge(pledge)}
+                      loading={isTaking}
+                      disabled={isTaking}
                     >
-                      Take Counterparty →
-                    </button>
+                      {isTaking ? take.stepLabel : "Take Counterparty →"}
+                    </Button>
                   )}
                   {isMatched && (
-                    <span className="text-xs text-blue-400">Waiting for ZK proof resolution</span>
+                    <span className="text-xs text-violet-400">Waiting for ZK proof resolution</span>
                   )}
                 </div>
-              </div>
+              </Card>
             );
           })}
         </div>
 
         {!isConnected && (
           <div className="text-center mt-8 py-10 glass rounded-2xl">
-            <p className="text-white/40 mb-4">Connect wallet to create or take pledges</p>
+            <p className="text-secondary mb-4">Connect wallet to create or take pledges</p>
             <ConnectWallet />
           </div>
         )}

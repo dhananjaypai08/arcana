@@ -1,27 +1,66 @@
 @import "tailwindcss";
 
+/* ── Design tokens ────────────────────────────────────────────────────
+   One accent color (violet) for all primary actions/links.
+   Tier colors (gold/slate/amber) are reserved ONLY for tier badges.
+   Status colors (emerald/amber/red) are reserved ONLY for tx/pledge status.
+   Text opacity is standardized to 3 levels: primary / secondary / muted.
+──────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-hover: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.1);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.58);
+  --text-muted: rgba(255, 255, 255, 0.34);
+
+  --accent: #8b5cf6;       /* violet-500 */
+  --accent-strong: #7c3aed; /* violet-600 */
+  --accent-soft: rgba(139, 92, 246, 0.12);
+
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+}
+
 /* ── Base ─────────────────────────────────────────────────────────── */
 
 body {
-  background: #000;
-  color: #fff;
+  background: #050505;
+  color: var(--text-primary);
   font-family: 'Inter', sans-serif;
 }
 
 /* ── Custom utilities (Tailwind v4 syntax) ────────────────────────── */
 
-@utility glow-purple {
-  box-shadow: 0 0 30px rgba(124, 58, 237, 0.4);
+@utility text-primary {
+  color: var(--text-primary);
 }
 
-@utility glow-gold {
-  box-shadow: 0 0 30px rgba(250, 204, 21, 0.3);
+@utility text-secondary {
+  color: var(--text-secondary);
+}
+
+@utility text-muted {
+  color: var(--text-muted);
+}
+
+@utility glow-purple {
+  box-shadow: 0 0 30px rgba(124, 58, 237, 0.35);
 }
 
 @utility glass {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
+}
+
+@utility glass-hover {
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  &:hover {
+    background: var(--surface-hover);
+  }
 }
 
 @utility glass-dark {
@@ -32,9 +71,8 @@ body {
 
 @utility gradient-bg {
   background:
-    radial-gradient(ellipse at 20% 50%, rgba(120, 40, 200, 0.15) 0%, transparent 60%),
-    radial-gradient(ellipse at 80% 20%, rgba(60, 20, 180, 0.12) 0%, transparent 60%),
-    radial-gradient(ellipse at 50% 80%, rgba(200, 160, 20, 0.08) 0%, transparent 60%);
+    radial-gradient(ellipse at 20% 0%, rgba(124, 58, 237, 0.1) 0%, transparent 55%),
+    radial-gradient(ellipse at 80% 15%, rgba(124, 58, 237, 0.06) 0%, transparent 55%);
 }
 
 @utility tier-a {
@@ -56,6 +94,14 @@ body {
   animation: pulse-dot 1.5s ease-in-out infinite;
 }
 
+@utility animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+@utility animate-slide-up {
+  animation: slide-up 0.25s ease-out;
+}
+
 /* ── Animations ───────────────────────────────────────────────────── */
 
 @keyframes pulse-dot {
@@ -66,6 +112,16 @@ body {
 @keyframes fillScore {
   from { stroke-dashoffset: 283; }
   to   { stroke-dashoffset: var(--offset); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Scrollbar ────────────────────────────────────────────────────── */

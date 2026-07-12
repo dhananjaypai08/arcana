@@ -8,7 +8,6 @@ allowing the full UI flow to be demonstrated.
 
 import os
 import json
-import asyncio
 import tempfile
 import hashlib
 from pathlib import Path
@@ -49,11 +48,13 @@ async def generate_proof(features: list[float]) -> dict:
 async def _generate_ezkl_proof(features: list[float]) -> dict:
     """Generate a real EZKL ZK proof (EZKL 23.x — get_srs is async, rest are sync)."""
     import ezkl
+    from eth_abi import decode as abi_decode
 
     with tempfile.TemporaryDirectory() as tmpdir:
         input_path = os.path.join(tmpdir, "input.json")
         witness_path = os.path.join(tmpdir, "witness.json")
         proof_path = os.path.join(tmpdir, "proof.json")
+        calldata_path = os.path.join(tmpdir, "calldata.bin")
 
         # Write input
         with open(input_path, "w") as f:
@@ -82,24 +83,31 @@ async def _generate_ezkl_proof(features: list[float]) -> dict:
         with open(proof_path) as f:
             proof_data = json.load(f)
 
-        # Extract proof bytes and instances
-        proof_hex = proof_data.get("proof", "")
-        instances_raw = proof_data.get("instances", [[]])
-        # Instances are field elements as hex strings in EZKL
-        instances = instances_raw[0] if instances_raw else []
+        # proof_data["proof"] is a raw byte array (list[int]), not hex — use
+        # "hex_proof" for display purposes only.
+        proof_hex = proof_data.get("hex_proof", "")
 
-        score, tier = _compute_score_and_tier(features, instances)
+        # Build the exact calldata EZKL would send to the on-chain verifier's
+        # verifyProof(bytes,uint256[]) and decode it back out. This is the only
+        # reliable way to get `instances` in the byte order/field-element form
+        # the Halo2Verifier assembly expects — the raw proof.json "instances"
+        # array is little-endian field-element bytes and cannot be parsed with
+        # a naive int(hex, 16).
+        calldata = bytes(ezkl.encode_evm_calldata(proof=proof_path, calldata=calldata_path))
+        proof_bytes_decoded, instances_decoded = abi_decode(["bytes", "uint256[]"], calldata[4:])
+
+        score, tier = _compute_score_and_tier(features)
 
         return {
             "proof_hex": proof_hex,
-            "instances": instances,
+            "instances": [str(i) for i in instances_decoded],
             "score": score,
             "tier": tier,
             "tier_label": ["None", "C", "B", "A"][tier],
             "collateral_ratio": [150, 120, 90, 70][tier],
             "mode": "ezkl",
-            "proof_bytes": _hex_to_bytes_param(proof_hex),
-            "instances_uint256": [str(int(i, 16)) if isinstance(i, str) else str(i) for i in instances],
+            "proof_bytes": "0x" + proof_bytes_decoded.hex(),
+            "instances_uint256": [str(i) for i in instances_decoded],
         }
 
 
@@ -145,9 +153,8 @@ def _generate_demo_proof(features: list[float]) -> dict:
     }
 
 
-def _compute_score_and_tier(features: list[float], instances: list) -> tuple[int, int]:
-    """Compute display score from features (for UI) and tier from ZK instances."""
-    # Display score from linear approximation
+def _compute_score_and_tier(features: list[float]) -> tuple[int, int]:
+    """Compute display score + tier from the credit features (linear approximation of CreditMLP)."""
     score = int((
         0.25 * features[0] + 0.20 * features[1] + 0.15 * features[2] +
         0.20 * features[3] + 0.15 * features[4] + 0.05 * features[5]
@@ -160,10 +167,3 @@ def _compute_score_and_tier(features: list[float], instances: list) -> tuple[int
     else: tier = 0
 
     return score, tier
-
-
-def _hex_to_bytes_param(hex_str: str) -> str:
-    """Convert proof hex to ABI-encodable bytes parameter."""
-    if hex_str.startswith("0x"):
-        return hex_str
-    return "0x" + hex_str
