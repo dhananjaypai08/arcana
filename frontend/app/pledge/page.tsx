@@ -114,8 +114,16 @@ export default function PledgePage() {
       return;
     }
     const premiumAmount = toUSDC(premium);
-    if (premiumAmount <= 0n) {
-      toast.error("Enter a valid premium amount");
+    if (premiumAmount < 1_000_000n) {
+      toast.error("Minimum premium is 1 USDC");
+      return;
+    }
+    if (targetTier <= currentTier) {
+      toast.error("Target tier must be higher than current tier");
+      return;
+    }
+    if (days < 1 || days > 365) {
+      toast.error("Duration must be between 1 and 365 days");
       return;
     }
 
@@ -223,7 +231,14 @@ export default function PledgePage() {
                 <label className="text-xs text-muted mb-2 block">Current Tier</label>
                 <select
                   value={currentTier}
-                  onChange={(e) => setCurrentTier(Number(e.target.value))}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setCurrentTier(next);
+                    // Target must exceed current — if current becomes Tier B,
+                    // the only valid target left is Tier A, so keep the state
+                    // in sync with what's actually selectable in the dropdown.
+                    if (next >= targetTier) setTargetTier(next + 1);
+                  }}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-primary focus:outline-none focus:border-violet-500"
                 >
                   <option value={1}>Tier C (120% ratio)</option>

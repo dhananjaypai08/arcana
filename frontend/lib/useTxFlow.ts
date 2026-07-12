@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { Abi } from "viem";
+import { BaseError, ContractFunctionRevertedError, type Abi } from "viem";
 import { useAccount, usePublicClient, useWriteContract } from "wagmi";
 import { addActivity, updateActivity } from "./activity";
 import { toast } from "./toast";
@@ -19,6 +19,16 @@ export interface TxStep {
 }
 
 function errorMessage(e: unknown, fallback: string): string {
+  if (e instanceof BaseError) {
+    // Dig past wagmi/viem's wrapper errors to find the actual require()
+    // reason from the contract, e.g. "Target must exceed current tier",
+    // instead of a generic "reverted on-chain" with no context.
+    const revertError = e.walk((err) => err instanceof ContractFunctionRevertedError);
+    if (revertError instanceof ContractFunctionRevertedError && revertError.reason) {
+      return revertError.reason;
+    }
+    return e.shortMessage || e.message || fallback;
+  }
   if (e && typeof e === "object") {
     const withMsg = e as { shortMessage?: string; message?: string };
     return withMsg.shortMessage || withMsg.message || fallback;
@@ -67,6 +77,27 @@ export function useTxFlow() {
         setStepIndex(i + 1);
         setStepLabel(step.label);
 
+        // Pre-flight simulate so we surface the *real* revert reason (e.g. a
+        // require() message) before ever asking the wallet to sign/spend gas,
+        // instead of finding out only after it reverts on-chain.
+        if (publicClient) {
+          try {
+            await publicClient.simulateContract({
+              address: step.address,
+              abi: step.abi,
+              functionName: step.functionName,
+              args: step.args,
+              account: address,
+            } as Parameters<typeof publicClient.simulateContract>[0]);
+          } catch (e) {
+            const msg = errorMessage(e, `${step.label} would fail`);
+            setError(msg);
+            setStatus("error");
+            toast.error(`${step.label} would fail`, msg);
+            return false;
+          }
+        }
+
         let hash: `0x${string}`;
         try {
           hash = await writeContractAsync({
@@ -95,9 +126,24 @@ export function useTxFlow() {
           const receipt = await publicClient!.waitForTransactionReceipt({ hash });
           if (receipt.status === "reverted") {
             updateActivity(activityId, { status: "failed" });
-            setError(`${step.label} reverted on-chain`);
+            // Re-simulate at the block right before the revert to recover the
+            // real require() reason (the receipt itself carries no reason).
+            let reason = "The transaction was reverted on-chain";
+            try {
+              await publicClient!.simulateContract({
+                address: step.address,
+                abi: step.abi,
+                functionName: step.functionName,
+                args: step.args,
+                account: address,
+                blockNumber: receipt.blockNumber - 1n,
+              } as Parameters<NonNullable<typeof publicClient>["simulateContract"]>[0]);
+            } catch (simErr) {
+              reason = errorMessage(simErr, reason);
+            }
+            setError(`${step.label} reverted: ${reason}`);
             setStatus("error");
-            toast.error(`${step.label} reverted`, "The transaction was reverted on-chain", `${EXPLORER}/tx/${hash}`);
+            toast.error(`${step.label} reverted`, reason, `${EXPLORER}/tx/${hash}`);
             return false;
           }
           updateActivity(activityId, { status: "confirmed" });
