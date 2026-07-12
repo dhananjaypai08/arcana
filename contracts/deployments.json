@@ -1,0 +1,12 @@
+{
+  "network": "hashkeyTestnet",
+  "chainId": "133",
+  "deployer": "0x882e5f6d3Be06B94B7E78ee194EF0CEE8Ad33E5c",
+  "usdc": "0x054ed45810DbBAb8B27668922D110669c9D88D0a",
+  "verifier": "0x3BA5bDec11CF7780684B7588646c114a6120f15a",
+  "arcanaCred": "0xF3f8246758F2A97e1D9fA12477768952Ca188AB1",
+  "arcanaLend": "0xdFd2978db888C3eFe1e8f89bf97Ac4C34bDbDc90",
+  "arcanaPledge": "0xDdd21a9f856C50ED7851608d0727224164E0f9b2",
+  "deployedAt": "2026-07-11T15:43:44.204Z",
+  "explorerBase": "https://explorer.hsk.xyz/address"
+}

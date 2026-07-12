@@ -14,11 +14,11 @@ router = APIRouter()
 # Lazy import web3 so server starts even without it
 def get_w3():
     try:
-        from web3 import Web3
-        rpc = os.getenv("HASHKEY_RPC", "https://mainnet.hsk.xyz")
-        w3 = Web3(Web3.HTTPProvider(rpc))
-        return w3
-    except ImportError:
+        from web3 import Web3  # type: ignore
+        rpc = os.getenv("HASHKEY_RPC", "https://testnet.hsk.xyz")
+        w3 = Web3(Web3.HTTPProvider(rpc, request_kwargs={"timeout": 5}))
+        return w3 if w3.is_connected() else None
+    except Exception:
         return None
 
 

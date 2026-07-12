@@ -2,146 +2,162 @@
 
 > **"Invisible inputs. Verifiable outputs. Tradeable facts."**
 
-The first zkML oracle on HashKey Chain — proves AI model execution via zero-knowledge proofs, tokenizes results as soulbound credentials, and enables under-collateralized DeFi lending + a derivatives market on personal on-chain reputation.
+The first zkML oracle on HashKey Chain — proves AI model execution via zero-knowledge proofs, mints the result as a soulbound credential, and unlocks under-collateralized DeFi lending + a derivatives market on personal on-chain reputation.
 
-## Architecture
+**Deployed on:** HashKey Chain Testnet (ChainID 133)
 
-```
-User (browser)
-  │ private signals
-  ▼
-Proof Server (FastAPI + EZKL)
-  │ generate Halo2 ZK proof from CreditMLP ONNX model
-  │ [HSP x402 gate: 0.01 USDC per proof]
-  ▼
-HashKey Chain Mainnet (ChainID 177)
-  ├── Halo2Verifier.sol     ← EZKL auto-generated ZK verifier
-  ├── ArcanaCred.sol        ← ERC-5192 soulbound NFT (tier credential)
-  ├── ArcanaLend.sol        ← Under-collateralized USDC lending
-  └── ArcanaPledge.sol      ← Score futures market
-```
+---
 
-## Quick Deploy
-
-### Prerequisites
-- Node.js 20+
-- Python 3.13+
-- HSK tokens on HashKey Chain mainnet (for gas)
-
-### 1. Install dependencies
-
-```bash
-# Contracts
-cd contracts && npm install
-
-# Python venv + zkML
-python3.13 -m venv .venv
-source .venv/bin/activate
-pip install torch --index-url https://download.pytorch.org/whl/cpu
-pip install onnx onnxscript ezkl
-
-# Frontend
-cd frontend && npm install
-```
-
-### 2. Train model + run EZKL setup (already done — artifacts in zkml/)
-
-```bash
-source .venv/bin/activate
-python3 zkml/train_model.py   # generates model.onnx
-python3 zkml/ezkl_setup.py    # generates ArcanaVerifier.sol, pk.key, vk.key
-```
-
-### 3. Configure and deploy contracts
-
-```bash
-cd contracts
-cp .env.example .env
-# Edit .env: add PRIVATE_KEY (wallet with HSK for gas)
-
-# Deploy to HashKey Chain mainnet
-npm run deploy:mainnet
-```
-
-### 4. Configure and start proof server
-
-```bash
-cd proof-server
-cp .env.example .env
-# Edit .env: add contract addresses from deployments.json
-
-source ../.venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8000
-```
-
-### 5. Configure and run frontend
-
-```bash
-cd frontend
-cp .env.local.example .env.local
-# Edit .env.local: add contract addresses + proof server URL
-
-npm run dev
-```
-
-## Contract Addresses (HashKey Chain Mainnet)
-
-After deployment, addresses are saved to `contracts/deployments.json`.
+## Contract Addresses (HashKey Testnet)
 
 | Contract | Address |
 |----------|---------|
-| Halo2Verifier | TBD |
-| ArcanaCred | TBD |
-| ArcanaLend | TBD |
-| ArcanaPledge | TBD |
+| Halo2Verifier (EZKL) | `0x3BA5bDec11CF7780684B7588646c114a6120f15a` |
+| ArcanaCred (ERC-5192) | `0xF3f8246758F2A97e1D9fA12477768952Ca188AB1` |
+| ArcanaLend | `0xdFd2978db888C3eFe1e8f89bf97Ac4C34bDbDc90` |
+| ArcanaPledge | `0xDdd21a9f856C50ED7851608d0727224164E0f9b2` |
+| USDC | `0x054ed45810DbBAb8B27668922D110669c9D88D0a` |
 
-## How ZK Proofs Work
+Explorer: https://testnet-explorer.hsk.xyz
 
-```python
-# EZKL proof pipeline (per user request)
-ezkl.gen_witness(input.json, network.ezkl, witness.json)
-ezkl.prove(witness.json, network.ezkl, pk.key, proof.json)
+---
 
-# On-chain verification
-Halo2Verifier.verifyProof(proof_bytes, instances)  # → bool
-ArcanaCred.mintTier(proof_bytes, instances)         # → ERC-5192 soulbound NFT
+## How It Works
+
+```
+Browser wallet (MetaMask)
+  │ private on-chain signals
+  ▼
+Proof Server (FastAPI + EZKL)
+  │ CreditMLP ONNX → Halo2 circuit → ZK proof (~1.5s)
+  │ [HSP x402: 0.01 USDC per proof]
+  ▼
+HashKey Chain Testnet
+  ├── Halo2Verifier   ← EZKL auto-generated, verifies proof on-chain
+  ├── ArcanaCred      ← ERC-5192 soulbound NFT minted on valid proof
+  ├── ArcanaLend      ← Borrow USDC at reduced collateral based on tier
+  └── ArcanaPledge    ← Bet on your own future ZK-proven score improvement
 ```
 
-## Credit Scoring Model
-
-**CreditMLP** — 3-layer PyTorch MLP (~800 parameters)
-
-Input features (normalized 0–1):
-- `wallet_age_days` — how long the wallet has been active
-- `tx_count_90d` — transaction count in last 90 days  
-- `defi_protocols_used` — number of DeFi protocols interacted with
-- `avg_hold_duration` — average token hold duration
-- `liquidation_penalty` — inverted liquidation history
-- `cross_chain_activity` — cross-chain bridge usage
-
-Output: Score 0–1000 → Tier mapping:
+### Credit Tiers
 
 | Score | Tier | Collateral Required |
 |-------|------|---------------------|
-| 850+ | A | 70% |
-| 700–849 | B | 90% |
-| 500–699 | C | 120% |
-| < 500 | None | 150% (standard) |
+| 850+  | A    | **70%** |
+| 700–849 | B  | **90%** |
+| 500–699 | C  | **120%** |
+| < 500 | —   | 150% (standard) |
+
+---
+
+## Running Locally
+
+### Prerequisites
+- Node.js 20+
+- Python 3.13 (not 3.14 — has a broken `pyexpat` on macOS)
+
+### 1. Frontend
+
+```bash
+cd frontend
+cp .env.example .env.local   # contract addresses already filled in
+npm install
+npm run dev                   # http://localhost:3000
+```
+
+### 2. Proof Server
+
+```bash
+# Use the project venv (Python 3.13 with ezkl + torch already installed)
+source .venv/bin/activate
+pip install -r proof-server/requirements.txt   # only 5 packages
+
+cd proof-server
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+The server starts in **demo mode** automatically — no extra setup needed. Real EZKL ZK proofs work via the `.venv` which already has `ezkl` installed.
+
+### 3. Connect wallet
+
+Open http://localhost:3000, click **Connect Wallet** (MetaMask / any injected wallet), switch to HashKey Testnet when prompted.
+
+---
+
+## Deploying
+
+### Contracts (already deployed — only needed if redeploying)
+
+```bash
+cd contracts
+# edit .env with your private key + RPC
+npx hardhat run scripts/deploy.ts --network hashkeyTestnet
+```
+
+### Frontend → Vercel
+
+```bash
+cd frontend
+vercel --prod
+```
+
+### Proof Server → Railway
+
+```bash
+cd proof-server
+railway login
+railway init
+railway up
+```
+
+---
 
 ## Tech Stack
 
-- **zkML**: EZKL 23.x + PyTorch → ONNX → Halo2 circuit → Solidity verifier
-- **Contracts**: Solidity 0.8.28, Hardhat, OpenZeppelin 5.x
-- **Proof Server**: Python 3.13, FastAPI, EZKL
-- **HSP**: x402 paywall on /proof/generate (0.01 USDC per ZK proof)
-- **Frontend**: Next.js 16, TypeScript, Tailwind CSS, Wagmi v2, RainbowKit
-- **Chain**: HashKey Chain Mainnet (ChainID 177)
+| Layer | Tech |
+|-------|------|
+| ZK ML | EZKL 23.x · PyTorch MLP → ONNX → Halo2 circuit |
+| Contracts | Solidity 0.8.28 · Hardhat · OpenZeppelin 5 · EVM Cancun |
+| Proof Server | Python 3.13 · FastAPI · EZKL (optional) |
+| Frontend | Next.js 16 · Wagmi v2 · injected wallet · Tailwind |
+| Chain | HashKey Chain Testnet (ChainID 133) |
 
-## Why This Wins
+---
 
-1. **First zkML deployment on HashKey Chain** — real Halo2 proof verified on-chain
-2. **Novel financial primitive** — derivatives market on ZK-proven personal attributes
-3. **Genuinely solves the collateral problem** — without revealing private data
-4. **HSP integration is native** — proof generation itself is the paid API
-5. **Clear demo** — judges see a real ZK proof on HashKey Chain explorer in real time
+## Project Structure
+
+```
+HashKeyHackathon/
+├── zkml/                  # ML model + ZK circuit artifacts
+│   ├── train_model.py     # PyTorch MLP training
+│   ├── ezkl_setup.py      # EZKL: gen_settings → compile → setup → verifier
+│   ├── model.onnx         # Exported model (opset 11)
+│   ├── network.ezkl       # Compiled circuit
+│   ├── pk.key / vk.key    # Proving / verification keys
+│   └── ArcanaVerifier.sol # EZKL auto-generated Halo2 Solidity verifier
+├── contracts/             # Hardhat project
+│   ├── contracts/
+│   │   ├── ArcanaVerifier.sol   # Halo2 ZK verifier (from EZKL)
+│   │   ├── ArcanaCred.sol       # ERC-5192 soulbound credential NFT
+│   │   ├── ArcanaLend.sol       # Under-collateralized USDC lending
+│   │   └── ArcanaPledge.sol     # Score futures market
+│   ├── scripts/deploy.ts
+│   └── deployments.json   # Live testnet addresses
+├── proof-server/          # FastAPI proof generation server
+│   ├── main.py
+│   ├── routes/proof.py    # POST /proof/demo and /proof/generate
+│   ├── routes/score.py    # GET /score/{address}
+│   └── requirements.txt   # Only 5 packages needed
+├── hsp-service/           # Node.js HSP x402 payment gateway
+└── frontend/              # Next.js 16 app
+    ├── app/page.tsx        # Landing page
+    ├── app/score/page.tsx  # ZK proof generation + credential view
+    ├── app/lend/page.tsx   # Borrow with credential-adjusted collateral
+    ├── app/pledge/page.tsx # Score futures marketplace
+    ├── components/ConnectWallet.tsx  # Direct injected wallet (no WalletConnect)
+    └── .env.example        # Testnet addresses pre-filled
+```
+
+---
+
+*ARCANA Protocol · HashKey Chain Horizon Hackathon 2026 · "Truth is the new collateral."*

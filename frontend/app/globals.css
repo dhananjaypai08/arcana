@@ -1,83 +1,75 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-:root {
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 0, 0, 0;
-}
+/* ── Base ─────────────────────────────────────────────────────────── */
 
 body {
-  color: rgb(var(--foreground-rgb));
   background: #000;
+  color: #fff;
   font-family: 'Inter', sans-serif;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-  .glow-purple {
-    box-shadow: 0 0 30px rgba(124, 58, 237, 0.4);
-  }
-  .glow-gold {
-    box-shadow: 0 0 30px rgba(250, 204, 21, 0.3);
-  }
-  .glass {
-    background: rgba(255, 255, 255, 0.04);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-  }
-  .glass-dark {
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-  }
+/* ── Custom utilities (Tailwind v4 syntax) ────────────────────────── */
+
+@utility glow-purple {
+  box-shadow: 0 0 30px rgba(124, 58, 237, 0.4);
 }
 
-/* Animated gradient background */
-.gradient-bg {
-  background: radial-gradient(ellipse at 20% 50%, rgba(120, 40, 200, 0.15) 0%, transparent 60%),
-              radial-gradient(ellipse at 80% 20%, rgba(60, 20, 180, 0.12) 0%, transparent 60%),
-              radial-gradient(ellipse at 50% 80%, rgba(200, 160, 20, 0.08) 0%, transparent 60%);
+@utility glow-gold {
+  box-shadow: 0 0 30px rgba(250, 204, 21, 0.3);
 }
 
-/* Score meter animation */
-@keyframes fillScore {
-  from { stroke-dashoffset: 283; }
-  to { stroke-dashoffset: var(--offset); }
+@utility glass {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.score-ring {
-  animation: fillScore 1.5s ease-out forwards;
+@utility glass-dark {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-/* ZK proof progress bar */
-@keyframes proofProgress {
-  0% { width: 0%; }
-  30% { width: 35%; }
-  60% { width: 65%; }
-  80% { width: 85%; }
-  100% { width: 100%; }
+@utility gradient-bg {
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(120, 40, 200, 0.15) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(60, 20, 180, 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 80%, rgba(200, 160, 20, 0.08) 0%, transparent 60%);
 }
 
-.proof-progress {
-  animation: proofProgress 3s ease-in-out forwards;
+@utility tier-a {
+  box-shadow: 0 0 20px rgba(250, 204, 21, 0.5);
+  border-color: #fbbf24;
 }
 
-/* Tier badge glow */
-.tier-a { box-shadow: 0 0 20px rgba(250, 204, 21, 0.5); border-color: #fbbf24; }
-.tier-b { box-shadow: 0 0 20px rgba(148, 163, 184, 0.5); border-color: #94a3b8; }
-.tier-c { box-shadow: 0 0 20px rgba(180, 120, 40, 0.5); border-color: #d97706; }
+@utility tier-b {
+  box-shadow: 0 0 20px rgba(148, 163, 184, 0.5);
+  border-color: #94a3b8;
+}
 
-/* Pulse animation for live indicator */
+@utility tier-c {
+  box-shadow: 0 0 20px rgba(180, 120, 40, 0.5);
+  border-color: #d97706;
+}
+
+@utility pulse-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* ── Animations ───────────────────────────────────────────────────── */
+
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  50%       { opacity: 0.4; }
 }
-.pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
 
-/* Scrollbar styling */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #111; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+@keyframes fillScore {
+  from { stroke-dashoffset: 283; }
+  to   { stroke-dashoffset: var(--offset); }
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar       { width: 6px; }
+::-webkit-scrollbar-track  { background: #111; }
+::-webkit-scrollbar-thumb  { background: #333; border-radius: 3px; }

@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Link from "next/link";
+import { ConnectWallet } from "@/components/ConnectWallet";
 import { fetchScoreSignals, generateProof, type ScoreSignals, type ProofResult, getTierConfig } from "@/lib/api";
 import { ARCANA_CRED_ABI } from "@/lib/abis";
 import { CONTRACTS } from "@/lib/wagmi";
@@ -107,7 +107,7 @@ export default function ScorePage() {
           <div className="text-6xl mb-6">🔮</div>
           <h2 className="text-2xl font-bold mb-4">Connect Your Wallet</h2>
           <p className="text-white/50 mb-8">Connect to fetch your on-chain credit signals</p>
-          <ConnectButton />
+          <ConnectWallet />
         </div>
       </div>
     );
@@ -123,7 +123,7 @@ export default function ScorePage() {
         <div className="flex items-center gap-4">
           <Link href="/lend" className="text-sm text-white/50 hover:text-white">Lend</Link>
           <Link href="/pledge" className="text-sm text-white/50 hover:text-white">Pledge</Link>
-          <ConnectButton showBalance={false} />
+          <ConnectWallet />
         </div>
       </nav>
 
@@ -249,7 +249,7 @@ export default function ScorePage() {
             <p className="text-white/40 text-sm">Calling ArcanaCred.mintTier() with ZK proof...</p>
             {txHash && (
               <a
-                href={`https://explorer.hsk.xyz/tx/${txHash}`}
+                href={`https://testnet-explorer.hsk.xyz/tx/${txHash}`}
                 target="_blank"
                 rel="noreferrer"
                 className="mt-4 inline-block text-xs text-violet-400 hover:text-violet-300 font-mono"
@@ -322,7 +322,7 @@ export default function ScorePage() {
                 {txHash && (
                   <div className="flex justify-between">
                     <span className="text-white/30">Tx Hash</span>
-                    <a href={`https://explorer.hsk.xyz/tx/${txHash}`} target="_blank" rel="noreferrer" className="text-violet-300 hover:text-violet-200">
+                    <a href={`https://testnet-explorer.hsk.xyz/tx/${txHash}`} target="_blank" rel="noreferrer" className="text-violet-300 hover:text-violet-200">
                       {txHash.slice(0, 12)}... ↗
                     </a>
                   </div>

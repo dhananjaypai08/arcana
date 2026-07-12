@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount } from "wagmi";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { ConnectWallet } from "@/components/ConnectWallet";
 
 const STATS = [
   { label: "Proofs Generated", value: "1,248" },
@@ -78,7 +78,7 @@ export default function Home() {
           <Link href="/score" className="text-sm text-white/60 hover:text-white transition-colors">Score</Link>
           <Link href="/lend" className="text-sm text-white/60 hover:text-white transition-colors">Lend</Link>
           <Link href="/pledge" className="text-sm text-white/60 hover:text-white transition-colors">Pledge</Link>
-          <ConnectButton />
+          <ConnectWallet />
         </div>
       </nav>
 
@@ -114,16 +114,7 @@ export default function Home() {
               Generate My ZK Proof →
             </Link>
           ) : (
-            <ConnectButton.Custom>
-              {({ openConnectModal }) => (
-                <button
-                  onClick={openConnectModal}
-                  className="px-8 py-4 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-xl transition-all glow-purple text-lg"
-                >
-                  Connect Wallet to Start →
-                </button>
-              )}
-            </ConnectButton.Custom>
+            <ConnectWallet />
           )}
           <Link
             href="/pledge"

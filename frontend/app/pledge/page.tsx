@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Link from "next/link";
+import { ConnectWallet } from "@/components/ConnectWallet";
 import { ARCANA_PLEDGE_ABI, ERC20_ABI } from "@/lib/abis";
 import { CONTRACTS } from "@/lib/wagmi";
 
@@ -91,7 +91,7 @@ export default function PledgePage() {
         <div className="flex items-center gap-4">
           <Link href="/score" className="text-sm text-white/50 hover:text-white">Score</Link>
           <Link href="/lend" className="text-sm text-white/50 hover:text-white">Lend</Link>
-          <ConnectButton showBalance={false} />
+          <ConnectWallet />
         </div>
       </nav>
 
@@ -202,7 +202,7 @@ export default function PledgePage() {
             </div>
 
             {txHash && (
-              <a href={`https://explorer.hsk.xyz/tx/${txHash}`} target="_blank" rel="noreferrer"
+              <a href={`https://testnet-explorer.hsk.xyz/tx/${txHash}`} target="_blank" rel="noreferrer"
                 className="mt-2 block text-xs text-violet-400 font-mono">
                 Tx: {txHash.slice(0, 16)}... ↗
               </a>
@@ -282,7 +282,7 @@ export default function PledgePage() {
         {!isConnected && (
           <div className="text-center mt-8 py-10 glass rounded-2xl">
             <p className="text-white/40 mb-4">Connect wallet to create or take pledges</p>
-            <ConnectButton />
+            <ConnectWallet />
           </div>
         )}
       </main>

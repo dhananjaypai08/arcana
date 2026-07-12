@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Link from "next/link";
+import { ConnectWallet } from "@/components/ConnectWallet";
 import { ARCANA_CRED_ABI, ARCANA_LEND_ABI, ERC20_ABI } from "@/lib/abis";
 import { CONTRACTS } from "@/lib/wagmi";
 import { getTierConfig } from "@/lib/api";
@@ -127,7 +127,7 @@ export default function LendPage() {
       <div className="min-h-screen gradient-bg flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">Connect Wallet</h2>
-          <ConnectButton />
+          <ConnectWallet />
         </div>
       </div>
     );
@@ -143,7 +143,7 @@ export default function LendPage() {
         <div className="flex items-center gap-4">
           <Link href="/score" className="text-sm text-white/50 hover:text-white">Score</Link>
           <Link href="/pledge" className="text-sm text-white/50 hover:text-white">Pledge</Link>
-          <ConnectButton showBalance={false} />
+          <ConnectWallet />
         </div>
       </nav>
 
@@ -328,7 +328,7 @@ export default function LendPage() {
               {txHash && (
                 <div className="mt-4 text-center">
                   <a
-                    href={`https://explorer.hsk.xyz/tx/${txHash}`}
+                    href={`https://testnet-explorer.hsk.xyz/tx/${txHash}`}
                     target="_blank"
                     rel="noreferrer"
                     className="text-xs text-violet-400 hover:text-violet-300 font-mono"
