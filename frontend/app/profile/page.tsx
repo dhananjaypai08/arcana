@@ -35,7 +35,7 @@ export default function ProfilePage() {
   const { address, isConnected } = useAccount();
   const activity = useActivity(address);
 
-  const { data: tier } = useReadContract({
+  const { data: tier, isLoading: tierLoading } = useReadContract({
     address: CONTRACTS.arcanaCred as `0x${string}`,
     abi: ARCANA_CRED_ABI,
     functionName: "getTier",
@@ -51,7 +51,7 @@ export default function ProfilePage() {
     query: { enabled: !!address && !!CONTRACTS.arcanaCred },
   });
 
-  const { data: position } = useReadContract({
+  const { data: position, isLoading: positionLoading } = useReadContract({
     address: CONTRACTS.arcanaLend as `0x${string}`,
     abi: ARCANA_LEND_ABI,
     functionName: "getPosition",
@@ -100,7 +100,13 @@ export default function ProfilePage() {
 
   const tierNum = typeof tier === "number" ? tier : (Number(tier) || 0);
   const ratioNum = typeof collateralRatio === "bigint" ? Number(collateralRatio) : 150;
+  // getPosition returns MULTIPLE named outputs (not a single struct), which
+  // viem decodes as a positional array: [collateral, borrowed, interest, tier,
+  // ratio, healthy]. Positional access is correct here (unlike getPledge,
+  // which returns one named struct and decodes to an object).
   const pos = position as unknown as (bigint | boolean)[] | undefined;
+  const borrowed = pos && typeof pos[1] === "bigint" ? pos[1] : 0n;
+  const hasLoan = borrowed > 0n;
 
   const pendingCount = activity.filter((a) => a.status === "pending").length;
   const confirmedCount = activity.filter((a) => a.status === "confirmed").length;
@@ -127,12 +133,18 @@ export default function ProfilePage() {
           <p className="text-secondary font-mono text-sm">{address}</p>
         </div>
 
-        {/* Summary stats */}
+        {/* Summary stats — all read live from on-chain state, not local storage */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-          <StatCard label="Credential Tier" value={tierNum > 0 ? `Tier ${["", "C", "B", "A"][tierNum]}` : "None"} />
-          <StatCard label="Collateral Ratio" value={`${ratioNum}%`} />
-          <StatCard label="Total Actions" value={String(activity.length)} />
-          <StatCard label="Pending Txs" value={String(pendingCount)} />
+          <StatCard
+            label="Credential Tier"
+            value={tierLoading ? "…" : tierNum > 0 ? `Tier ${["", "C", "B", "A"][tierNum]}` : "None"}
+          />
+          <StatCard label="Collateral Ratio" value={tierLoading ? "…" : `${ratioNum}%`} />
+          <StatCard
+            label="Active Loan"
+            value={positionLoading ? "…" : hasLoan ? `${formatUSDC(borrowed)} USDC` : "None"}
+          />
+          <StatCard label="My Pledges" value={String(myPledges.length)} />
         </div>
 
         <div className="grid md:grid-cols-2 gap-6 mb-8">
@@ -155,19 +167,21 @@ export default function ProfilePage() {
           {/* Lending position */}
           <Card>
             <h2 className="font-semibold mb-4 text-primary">Lending Position</h2>
-            {pos && pos[1] && (pos[1] as bigint) > 0n ? (
+            {positionLoading ? (
+              <p className="text-muted text-sm text-center py-2">Loading position…</p>
+            ) : hasLoan ? (
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
                   <span className="text-secondary">Collateral</span>
-                  <span className="text-primary">{formatUSDC(pos[0] as bigint)} USDC</span>
+                  <span className="text-primary">{formatUSDC(pos![0] as bigint)} USDC</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-secondary">Borrowed</span>
-                  <span className="text-primary">{formatUSDC(pos[1] as bigint)} USDC</span>
+                  <span className="text-primary">{formatUSDC(borrowed)} USDC</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-secondary">Health</span>
-                  <span className={pos[5] ? "text-emerald-400" : "text-red-400"}>{pos[5] ? "Healthy" : "At Risk"}</span>
+                  <span className={pos![5] ? "text-emerald-400" : "text-red-400"}>{pos![5] ? "Healthy" : "At Risk"}</span>
                 </div>
               </div>
             ) : (
@@ -211,7 +225,12 @@ export default function ProfilePage() {
         {/* Activity log */}
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-primary">Activity History</h2>
+            <div>
+              <h2 className="font-semibold text-primary">Activity History</h2>
+              <p className="text-xs text-muted mt-0.5">
+                Actions recorded in this browser. Your credential, loan and pledges above always reflect live on-chain state.
+              </p>
+            </div>
             {activity.length > 0 && (
               <Button
                 variant="ghost"
