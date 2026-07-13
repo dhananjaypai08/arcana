@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import { hashkeyTestnet } from "@/lib/wagmi";
+import { DropdownPortal } from "@/components/ui/DropdownPortal";
+import { toast } from "@/lib/toast";
 
 const HASHKEY_TESTNET = {
   chainId: "0x85",           // 133 in hex
@@ -18,17 +20,35 @@ interface Eip1193Provider {
 
 export function ConnectWallet() {
   const { address, isConnected, chainId } = useAccount();
-  const { connect, connectors, isPending, error } = useConnect();
+  const { connectAsync, connectors, isPending } = useConnect();
   const { disconnect } = useDisconnect();
   const { switchChain } = useSwitchChain();
 
   const [mounted, setMounted] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [connectingUid, setConnectingUid] = useState<string | null>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- required mount guard to avoid SSR/client hydration mismatch for wallet state
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!showPicker) return;
+    function onClick(e: MouseEvent) {
+      const target = e.target as Element;
+      // The dropdown itself lives in a body-level portal (see DropdownPortal),
+      // so it's not a DOM descendant of anchorRef — check for it explicitly,
+      // otherwise a click on a wallet option would register as "outside" and
+      // close the menu on mousedown before the option's onClick ever fires.
+      const insideAnchor = anchorRef.current?.contains(target);
+      const insidePortal = target.closest?.("[data-dropdown-portal]");
+      if (!insideAnchor && !insidePortal) setShowPicker(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [showPicker]);
 
   // Avoid SSR mismatch — render nothing until client-side
   if (!mounted) {
@@ -37,9 +57,20 @@ export function ConnectWallet() {
     );
   }
 
-  // De-dupe connectors by name (EIP-6963 discovery + explicit injected() can overlap)
-  const uniqueConnectors = connectors.filter(
-    (c, i) => connectors.findIndex((c2) => c2.name === c.name) === i
+  // wagmi's plain injected() connector (id: "injected") always targets the
+  // shared, ambiguous `window.ethereum` object. When multiple extensions are
+  // installed, wallets like Coinbase Wallet monkey-patch that object with
+  // their own multi-provider arbitration (evmAsk.js's `selectExtension`),
+  // which intermittently throws "Unexpected error" — this is what causes
+  // wallet options to randomly "not work" when clicked. EIP-6963-discovered
+  // connectors instead reference their own isolated provider instance
+  // directly, sidestepping that shared object entirely. So: whenever a
+  // specific EIP-6963 connector is available, drop the ambiguous generic
+  // "injected" one and only offer the specific, reliable ones.
+  const specificConnectors = connectors.filter((c) => c.id !== "injected");
+  const candidateConnectors = specificConnectors.length > 0 ? specificConnectors : connectors;
+  const uniqueConnectors = candidateConnectors.filter(
+    (c, i) => candidateConnectors.findIndex((c2) => c2.name === c.name) === i
   );
 
   // No wallet extensions detected at all
@@ -62,9 +93,17 @@ export function ConnectWallet() {
   // an ambiguous multi-provider proxy and throws "Unexpected error" from
   // evmAsk.js's internal selectExtension arbitration.
   if (!isConnected) {
-    const handleConnect = (connector: (typeof uniqueConnectors)[number]) => {
+    const handleConnect = async (connector: (typeof uniqueConnectors)[number]) => {
       setShowPicker(false);
-      connect({ connector });
+      setConnectingUid(connector.uid);
+      try {
+        await connectAsync({ connector });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Connection failed";
+        toast.error(`Couldn't connect ${connector.name}`, msg.slice(0, 120));
+      } finally {
+        setConnectingUid(null);
+      }
     };
 
     // Single wallet available — connect directly, no picker needed
@@ -82,7 +121,7 @@ export function ConnectWallet() {
 
     // Multiple wallets — let the user pick which one to use
     return (
-      <div className="relative">
+      <div className="relative" ref={anchorRef}>
         <button
           onClick={() => setShowPicker((v) => !v)}
           disabled={isPending}
@@ -90,24 +129,22 @@ export function ConnectWallet() {
         >
           {isPending ? "Connecting..." : "Connect Wallet"}
         </button>
-        {showPicker && (
-          <div className="absolute right-0 top-full mt-2 w-48 bg-neutral-900 border border-white/10 rounded-xl overflow-hidden shadow-xl z-50">
-            {uniqueConnectors.map((c) => (
-              <button
-                key={c.uid}
-                onClick={() => handleConnect(c)}
-                className="w-full text-left px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                {c.name}
-              </button>
-            ))}
-          </div>
-        )}
-        {error && (
-          <p className="absolute right-0 top-full mt-1 text-xs text-red-400 whitespace-nowrap">
-            {error.message.slice(0, 60)}
-          </p>
-        )}
+        <DropdownPortal
+          anchorRef={anchorRef}
+          open={showPicker}
+          className="w-48 bg-neutral-900 border border-white/10 rounded-xl overflow-hidden shadow-xl"
+        >
+          {uniqueConnectors.map((c) => (
+            <button
+              key={c.uid}
+              onClick={() => handleConnect(c)}
+              disabled={connectingUid === c.uid}
+              className="w-full text-left px-4 py-2.5 text-sm text-white/80 hover:bg-white/10 disabled:opacity-50 transition-colors cursor-pointer"
+            >
+              {connectingUid === c.uid ? "Connecting..." : c.name}
+            </button>
+          ))}
+        </DropdownPortal>
       </div>
     );
   }
