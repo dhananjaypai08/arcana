@@ -57,44 +57,32 @@ async def get_score_signals(address: str):
 
 
 async def _fetch_signals(address: str) -> ScoreSignals:
-    """Fetch real on-chain data."""
+    """Fetch real on-chain data. Raises if the RPC is unavailable or the
+    on-chain reads fail, so the caller can fall back to demo signals instead
+    of silently returning an all-zero result that looks like real data."""
     w3 = get_w3()
 
-    wallet_age_days = 0.0
-    tx_count_90d = 0.0
-    defi_protocols_used = 0.0
-    avg_hold_duration = 0.0
-    liquidation_penalty = 0.0
-    cross_chain_activity = 0.0
+    if not (w3 and w3.is_connected()):
+        raise RuntimeError("RPC unavailable — cannot fetch real on-chain signals")
 
-    if w3 and w3.is_connected():
-        try:
-            latest_block = w3.eth.get_block("latest")
-            block_number = latest_block["number"]
+    # Wallet age: estimate from first tx (simplified)
+    tx_count = w3.eth.get_transaction_count(w3.to_checksum_address(address))
 
-            # Wallet age: estimate from first tx (simplified)
-            tx_count = w3.eth.get_transaction_count(
-                w3.to_checksum_address(address)
-            )
+    # Normalize tx count (0 = 0 tx, 1 = 500+ tx)
+    tx_count_90d = min(tx_count / 500.0, 1.0)
 
-            # Normalize tx count (0 = 0 tx, 1 = 500+ tx)
-            tx_count_90d = min(tx_count / 500.0, 1.0)
+    # Wallet age proxy: assume ~7500 blocks/day on HashKey Chain
+    # Check if address has any history at all
+    balance = w3.eth.get_balance(w3.to_checksum_address(address))
 
-            # Wallet age proxy: assume ~7500 blocks/day on HashKey Chain
-            # Check if address has any history at all
-            balance = w3.eth.get_balance(w3.to_checksum_address(address))
+    # Use tx count as proxy for age (more tx = older wallet)
+    wallet_age_days = min(tx_count / 200.0, 1.0)  # rough proxy
 
-            # Use tx count as proxy for age (more tx = older wallet)
-            wallet_age_days = min(tx_count / 200.0, 1.0)  # rough proxy
+    # Simulate protocol diversity from tx count
+    defi_protocols_used = min(tx_count / 100.0, 1.0) * 0.7
 
-            # Simulate protocol diversity from tx count
-            defi_protocols_used = min(tx_count / 100.0, 1.0) * 0.7
-
-            # Cross-chain activity (check if balance on ETH mainnet - simplified)
-            cross_chain_activity = 0.3 if balance > 0 else 0.1
-
-        except Exception:
-            pass
+    # Cross-chain activity (check if balance on ETH mainnet - simplified)
+    cross_chain_activity = 0.3 if balance > 0 else 0.1
 
     # For demo purposes, use tx_count to estimate all features
     avg_hold_duration = (wallet_age_days + tx_count_90d) / 2
