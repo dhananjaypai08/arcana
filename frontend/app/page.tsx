@@ -24,7 +24,7 @@ const TIER_CARDS = [
     border: "border-yellow-500/40",
     glow: "shadow-yellow-500/20",
     badge: "bg-yellow-500 text-black",
-    desc: "Elite DeFi history. Borrow with just 70% collateral — 2.1× your capital efficiency.",
+    desc: "Elite DeFi history. Borrow with just 70% collateral, 2.1× your capital efficiency.",
   },
   {
     tier: "B",
@@ -44,7 +44,7 @@ const TIER_CARDS = [
     border: "border-amber-700/40",
     glow: "shadow-amber-700/20",
     badge: "bg-amber-700 text-white",
-    desc: "Growing history. 120% vs 150% default — and create a Pledge to improve.",
+    desc: "Growing history. 120% vs 150% default, and create a Pledge to improve.",
   },
 ];
 
@@ -69,7 +69,7 @@ export default function Home() {
       <section className="relative z-10 max-w-6xl mx-auto px-6 pt-28 pb-20 text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-violet-500/30 bg-violet-500/10 text-violet-300 text-xs font-mono mb-8">
           <span className="w-1.5 h-1.5 rounded-full bg-violet-400 pulse-dot" />
-          HashKey Chain Testnet · zkML Powered
+          Powered by zkML
         </div>
 
         <h1 className="text-6xl md:text-7xl font-bold tracking-tight mb-6 leading-tight">
@@ -85,7 +85,7 @@ export default function Home() {
         <p className="text-xl text-secondary max-w-2xl mx-auto mb-12 leading-relaxed">
           ARCANA uses zero-knowledge machine learning to prove your DeFi creditworthiness
           without revealing your data. Your ZK credential unlocks under-collateralized borrowing
-          and a new market — betting on your own improvement.
+          and a new market forbetting on your own improvement.
         </p>
 
         <div className="flex items-center justify-center gap-4 flex-wrap">
@@ -128,13 +128,13 @@ export default function Home() {
             {
               step: "02",
               title: "EZKL Generates ZK Proof",
-              desc: "A zero-knowledge proof is generated that our credit model ran on your private inputs and produced a score — without revealing the inputs or model weights.",
+              desc: "A zero-knowledge proof is generated that our credit model ran on your private inputs and produced a score without revealing the inputs or model weights.",
               icon: "⚡",
             },
             {
               step: "03",
               title: "Proof Verified On-Chain",
-              desc: "The ZK proof is verified by a Halo2 smart contract on HashKey Chain. If valid, a soulbound credential NFT is minted — unlocking better collateral ratios.",
+              desc: "The ZK proof is verified by a Halo2 smart contract on HashKey Chain. If valid, a soulbound credential NFT is minted, unlocking better collateral ratios.",
               icon: "✓",
             },
           ].map((item) => (
@@ -184,7 +184,7 @@ export default function Home() {
           <h2 className="text-3xl font-bold mb-4 text-primary">Bet on Your Future Self</h2>
           <p className="text-secondary max-w-lg mx-auto mb-8 leading-relaxed">
             The ARCANA Pledge Market lets you tokenize self-improvement. Pledge to reach a higher
-            credit tier, earn a premium if you succeed — all settled trustlessly by ZK proofs.
+            credit tier, earn a premium if you succeed, all settled trustlessly by ZK proofs.
             A derivatives market on personal attributes that has never existed before.
           </p>
           <ButtonLink href="/pledge" variant="secondary">
